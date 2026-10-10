@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 前沿学术研报</title>
+    <!-- KaTeX 数学公式渲染库 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+            onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --primary: #0f172a;
+            --secondary: #334155;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --accent: #2563eb;
+            --score-bg: #f8fafc;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 32px 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 32px 36px 24px 36px;
+            border-bottom: 1px solid var(--border);
+            background: #ffffff;
+        }
+
+        .header-meta {
+            font-size: 11px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header-title {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.02em;
+        }
+
+        .header-desc {
+            margin: 8px 0 0 0;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 36px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .stats-bar strong {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .content {
+            padding: 36px;
+        }
+
+        .track-section {
+            margin-bottom: 44px;
+        }
+
+        .track-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .track-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px;
+            margin-bottom: 22px;
+        }
+
+        .track-title {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: var(--primary);
+            text-transform: uppercase;
+        }
+
+        .track-count {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        .paper-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .paper-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .paper-title {
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.4;
+            margin: 0 0 10px 0;
+        }
+
+        .paper-title a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .paper-title a:hover {
+            color: var(--accent);
+            text-decoration: underline;
+        }
+
+        .paper-meta {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-github {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            text-decoration: none;
+        }
+
+        /* 维度打分栏 (Web端使用 CSS Grid) */
+        .score-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .score-item {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .score-val {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 2px;
+        }
+
+        /* 核心白话与输入输出定义模块 */
+        .tldr-box {
+            background: #f8fafc;
+            border-left: 4px solid var(--primary);
+            padding: 12px 16px;
+            border-radius: 0 6px 6px 0;
+            font-size: 14px;
+            color: var(--primary);
+            margin-bottom: 14px;
+            line-height: 1.6;
+        }
+
+        .io-box {
+            background: #fafafa;
+            border: 1px dashed var(--border);
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-size: 13px;
+            color: var(--secondary);
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .io-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .io-label {
+            font-weight: 700;
+            color: var(--muted);
+            min-width: 75px;
+        }
+
+        .section-label {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted);
+            margin: 16px 0 8px 0;
+        }
+
+        .tech-list {
+            margin: 0 0 16px 0;
+            padding-left: 20px;
+            font-size: 13px;
+            color: var(--secondary);
+            line-height: 1.6;
+        }
+
+        .tech-list li {
+            margin-bottom: 8px;
+        }
+
+        .takeaway-box {
+            font-size: 13px;
+            color: var(--secondary);
+            background: #f1f5f9;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+
+        .paper-links {
+            display: flex;
+            gap: 14px;
+            font-size: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .paper-links a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .paper-links a:hover {
+            text-decoration: underline;
+        }
+
+        .footer {
+            padding: 24px 36px;
+            border-top: 1px solid var(--border);
+            background: #ffffff;
+            font-size: 12px;
+            color: var(--muted);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="padding: 14px 36px 0 36px; font-size: 13px; color: var(--muted); background: #ffffff;">
+            <a href="../index.html" style="color: var(--accent); text-decoration: none; font-weight: 500;">&larr; 返回论文专区目录</a>
+            <span style="margin: 0 8px; color: var(--border);">|</span>
+            <a href="../../index.html" style="color: var(--muted); text-decoration: none;">知识门户总览</a>
+        </div>
+        <header class="header">
+            <div class="header-meta">前沿技术文献速递 &bull; GITHUB PAGES WEB VERSION</div>
+            <h1 class="header-title">AI 前沿学术研报</h1>
+            <p class="header-desc">自动驾驶 &bull; 世界模型 &bull; WAM &bull; 具身智能与 VLA 策略</p>
+        </header>
+
+        <div class="stats-bar">
+            <span>日期: <strong>2026-10-11</strong></span>
+            <span>今日精选: <strong>7 篇</strong></span>
+            <span>累计索引: <strong>7 篇</strong></span>
+        </div>
+
+        <main class="content">
+            
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">测试期训练 & 推理扩展 (Test-Time Training / Scaling)</span>
+                    <span class="track-count">1 selected</span>
+                </div>
+
+                
+                
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="https://arxiv.org/abs/2610.12005v1" target="_blank">Test-Time Compute for Tabular Foundation Models: Mechanisms, Gains, and Limits</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        
+                        <a href="https://github.com/kanghui-learning/test-time-compute-for-tabular-foundation-models" target="_blank" class="badge badge-github">GitHub 开源</a>
+                        
+
+                        <span>发表日期: 2026-10-08</span>
+                        <span>作者: Kanghui Ning, Marin Biloš, James T. Wilson et al.</span>
+                        <span>arXiv ID: 2610.12005v1</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div>创新性 Novelty</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>工程可行性 Engineering</div>
+                            <div class="score-val">8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>实验完备性 Empirical</div>
+                            <div class="score-val">8/10</div>
+                        </div>
+                        <div class="score-item" style="border-left: 1px solid #e2e8f0;">
+                            <div>综合指数 Overall</div>
+                            <div class="score-val" style="color: var(--accent);">8/10</div>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 白话概要 TL;DR -->
+                    
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>本文研究在推理阶段多花算力（测试时计算）能否提升表格基础模型（把训练表当作上下文、直接预测查询行的预训练模型）的精度，并把可选策略拆成三块：改参数（适配）、合并多个预测（聚合）、挑选放入上下文的行或列（上下文构造）。关键发现是，不必大改模型：只训练控制注意力里查询-键相似度的极少量对角乘子（DiagScale）就能接近全量微调；聚合时逐步挑出互补的成员（贪心选择）比把大家均匀平均更稳。核心直觉是，测试时算力要用在修正“查询与支持样本的相似度”或“成员之间的互补误差”上，而不是盲目增加预测数量或上下文长度。
+                    </div>
+                    
+
+                    <!-- 输入与输出定义 -->
+                    
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>带标签的表格训练数据（特征列与目标列，可划分验证集）、查询表格样本特征；上下文构造时还可包括候选支持行/列或检索得到的上下文；模型侧为预训练表格基础模型（如 TabPFN-3、TabICL v2、TabFM）。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>查询样本的最终预测（分类标签或回归值）；以及产生该预测所需的适配后参数、成员预测池与聚合规则，或检索/构造出的支持上下文。</span>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 核心机制与数学公式 -->
+                    
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        
+                        <li>将测试时计算统一因子化为 $\hat{y}(\mathbf{x})=\mathcal{R}_{\mathbf{w}}(\{f_{\theta_m}(\mathbf{x};g_m(D,\mathbf{x}))\}_{m=1}^M)$，分别对应参数适配 $\theta_m$、聚合 $\mathcal{R}_{\mathbf{w}}$ 与上下文构造 $g_m$。</li>
+                        
+                        <li>DiagScale 受 SoftScale 启发，在注意力中学维度特定 query 乘子，可写为 $\tilde{\mathbf{q}}=\mathbf{q}\odot \mathbf{s}(n)\odot \mathbf{g}(\mathbf{q})$；仅更新 0.003-0.03% 参数，达到接近全量微调的收益。</li>
+                        
+                        <li>聚合同时考虑成员池组成和选择策略；在 96 种配置池上用贪心选择比默认预测器降低约 2.4% 误差，而均匀平均可能变差，说明验证集驱动的选择性合并更稳。</li>
+                        
+                    </ul>
+                    
+
+                    <!-- 实验结论 -->
+                    
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在 TabArena 上，DiagScale 仅更新约 0.003-0.03% 参数，Elo 增益为 +26，与全量微调的 +25 相当；96 配置池上贪心选择比默认预测器降低约 2.4% 误差，但适配与聚合叠加需显著更多算力。
+                    </div>
+                    
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.12005v1" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.12005v1.pdf" target="_blank">Download PDF</a>
+                        <a href="https://arxiv.org/abs/2610.12005v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                
+                
+            </section>
+            
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">后训练强化学习与机械可解释性 (Post-Training, RLHF & Interpretability)</span>
+                    <span class="track-count">1 selected</span>
+                </div>
+
+                
+                
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="https://arxiv.org/abs/2610.12248v1" target="_blank">EgoVoice: Proactive Spoken Assistance from Egocentric Multimodal Streams</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        
+                        <a href="https://github.com/snakers4/silero-vad" target="_blank" class="badge badge-github">GitHub 开源</a>
+                        
+
+                        <span>发表日期: 2026-10-08</span>
+                        <span>作者: Heeseung Kim</span>
+                        <span>arXiv ID: 2610.12248v1</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div>创新性 Novelty</div>
+                            <div class="score-val">8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>工程可行性 Engineering</div>
+                            <div class="score-val">6/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>实验完备性 Empirical</div>
+                            <div class="score-val">8/10</div>
+                        </div>
+                        <div class="score-item" style="border-left: 1px solid #e2e8f0;">
+                            <div>综合指数 Overall</div>
+                            <div class="score-val" style="color: var(--accent);">7.5/10</div>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 白话概要 TL;DR -->
+                    
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>可穿戴 AR 助手需要像旁边的真人教练一样，看着你干活、在你快出错前主动开口提醒，而不是等你提问。EgoVoice 解决的就是这个联合难题：在连续的第一人称视频和音频流里，同时决定“现在要不要说话”（时机）和“该说什么”（内容）。关键技术名词拆解：所谓“主动干预”就是助手自己判断何时插话，而非被动应答；“全双工流式”指模型能一边看画面、一边听声音、一边说话，三者同步进行；“源分离”是把混在一起的背景噪音、用户说话、教练说话拆成独立音轨；训练上用 SFT 教会它靠谱的基础行为，再用 DPO（直接偏好优化，即用“哪种干预更好”的对比数据来调教模型）进一步打磨开口时机，核心直觉是语音播放本身要花时间，因此说话必须提前到与用户动作精确对齐，而不是把文本指令简单读出来。
+                    </div>
+                    
+
+                    <!-- 输入与输出定义 -->
+                    
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>第一人称连续 RGB 视频帧流与同步音频流（含用户语音、背景声、教练语音），外加系统提示中的任务名称和分步操作配方。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>每个时间块（一帧视频加约一秒音频）输出 Listen 或 Speak 决策；若为 Speak，则生成指导文本 token，并进一步解码为语音 token 与最终语音波形。</span>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 核心机制与数学公式 -->
+                    
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        
+                        <li>数据构建：用 SAM-Audio 分离并保留背景声，经 Silero VAD 确认无残留人声；再用 IndexTTS2 重合成用户与教练语音，按时长不超原句和 ASR 转录一致来筛选，使语音时间线与真实动作对齐。</li>
+                        
+                        <li>流式听/说接口：按块处理一帧视频加一秒音频，逐块输出 Listen 或 Speak；在 Speak 块上 LLM 生成文本 token，语音 token 解码器将其转为 S3 语音 token 并合成波形。</li>
+                        
+                        <li>训练与偏好优化：先对 MiniCPM-o 4.5 用 LoRA（$r=32$，$\alpha=64$）做 SFT，再以 DPO（$\beta=0.1$）优化干预行为，使模型更常在对齐窗口内提前给出有用指导。</li>
+                        
+                    </ul>
+                    
+
+                    <!-- 实验结论 -->
+                    
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在 170 个测试会话上，EgoVoice-DPO 把 onset F1 从 MiniCPM-o 4.5 的 0.113 提升到 0.324，并将 end-vs-act 由约 $-4.69$s 的负值转为约 $+1.75$s 的正值，说明主动干预时机与内容均明显优于零样本骨干及现有对话/主动助手基线。
+                    </div>
+                    
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.12248v1" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.12248v1.pdf" target="_blank">Download PDF</a>
+                        <a href="https://arxiv.org/abs/2610.12248v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                
+                
+            </section>
+            
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">流匹配与视频生成基础模型 (Flow Matching & Video Generation)</span>
+                    <span class="track-count">1 selected</span>
+                </div>
+
+                
+                
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="https://arxiv.org/abs/2610.12459v1" target="_blank">WorldGuide: Goal-Directed Video World Model for Procedural Task Execution</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        
+                        <a href="https://github.com/mbzuai-oryx/WorldGuide" target="_blank" class="badge badge-github">GitHub 开源</a>
+                        
+
+                        <span>发表日期: 2026-10-08</span>
+                        <span>作者: Ankan Deria, Komal Kumar, Hisham Cholakkal et al.</span>
+                        <span>arXiv ID: 2610.12459v1</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div>创新性 Novelty</div>
+                            <div class="score-val">8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>工程可行性 Engineering</div>
+                            <div class="score-val">6/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>实验完备性 Empirical</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item" style="border-left: 1px solid #e2e8f0;">
+                            <div>综合指数 Overall</div>
+                            <div class="score-val" style="color: var(--accent);">7.5/10</div>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 白话概要 TL;DR -->
+                    
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>WorldGuide 要解决的是长程程序性任务视频生成不能只看开头一次性生成，必须像闭环控制一样边生成边根据已生成的画面调整下一步。给定初始图像和目标，它用 ContextPlanner 从当前视觉状态和最近动作-片段历史预测下一个原子动作或完成信号，再用 Executor 生成该动作对应的短视频片段，循环直到完成。关键概念：闭环任务执行是把视频生成当作在“视觉世界空间”里逐步行动，即每一步的产物决定下一步；原子动作是任务拆解后不可再分的步骤（如“拿起杯子”）；层级视觉记忆是对越旧的画面用越粗的空间压缩来存，从而让长历史不爆显存。核心直觉是让规划与执行在同一套步骤级演示上训练，从而缩小“决定动作”与“真正生成出该动作效果”之间的鸿沟。
+                    </div>
+                    
+
+                    <!-- 输入与输出定义 -->
+                    
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>初始单帧 RGB 图像、任务目标自然语言描述；执行循环中额外输入当前已生成的视频片段作为当前视觉状态，以及最近 K=3 个动作-片段对组成的历史，Executor 另接收层级视觉记忆中的历史隐帧。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>ContextPlanner 输出下一个原子动作的自然语言指令，或任务完成标记；若未完成，Executor 输出条件于该动作和当前状态的下一段短视频片段，最终所有片段拼接为完整程序性任务视频。</span>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 核心机制与数学公式 -->
+                    
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        
+                        <li>闭环规划-执行循环：$\pi_\theta$ 从 $(g,x_t,h_t)$ 预测 $a_t \in \mathcal{A} \cup \{\mathtt{DONE}\}$；若未完成则 $f_\phi$ 生成 $x_{t+1}=f_\phi(a_t,x_t,M_t)$，并更新 $h_{t+1}=h_t+a_t$ 与 $M_{t+1}=\mathrm{update}(M_t,x_{t+1})$。</li>
+                        
+                        <li>规划器由 Qwen2.5-VL-7B 做步骤级监督微调，仅凭视觉进度预测下一原子动作或完成，抑制重复步骤；执行器由 HunyuanVideo-1.5 以冻结规划器嵌入的动作条件训练。</li>
+                        
+                        <li>执行器用流匹配目标 $\mathcal{L}_{\text{exec}}=\mathbb{E}_{z,\epsilon,\sigma}\!\left[\frac{\|m\odot(\hat{y}_\phi-(\epsilon-z))\|_2^2}{\max(\sum m,1)}\right]$，配合层级视觉记忆按帧龄分配空间压缩率，约束历史 token 开销。</li>
+                        
+                    </ul>
+                    
+
+                    <!-- 实验结论 -->
+                    
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在 WorldGuide-Bench 上，仅用初始图像和目标的 WorldGuide 达到 33.33% Task Success，高于接收参考动作计划的 MiniMax-H3 的 29.90%；在 VideoCraft-Bench 目标条件下达到 47.69%，远超 MiniMax-H3 的 32.73%。
+                    </div>
+                    
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.12459v1" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.12459v1.pdf" target="_blank">Download PDF</a>
+                        <a href="https://arxiv.org/abs/2610.12459v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                
+                
+            </section>
+            
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">大模型推理与长上下文架构 (LLM Reasoning & Architecture)</span>
+                    <span class="track-count">1 selected</span>
+                </div>
+
+                
+                
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="https://arxiv.org/abs/2610.12114v1" target="_blank">Universal Textual Teaching for LLMs</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        
+
+                        <span>发表日期: 2026-10-08</span>
+                        <span>作者: Zhanyi Lu, Huan Wang</span>
+                        <span>arXiv ID: 2610.12114v1</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div>创新性 Novelty</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>工程可行性 Engineering</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>实验完备性 Empirical</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item" style="border-left: 1px solid #e2e8f0;">
+                            <div>综合指数 Overall</div>
+                            <div class="score-val" style="color: var(--accent);">7.5/10</div>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 白话概要 TL;DR -->
+                    
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>Universal Textual Teaching for LLMs 针对当前任务构建了专门的表征与策略框架。
+                    </div>
+                    
+
+                    <!-- 输入与输出定义 -->
+                    
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>多模态观测数据与历史序列</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>未来状态预测或动作控制量</span>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 核心机制与数学公式 -->
+                    
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        
+                        <li>构建紧凑的输入特征投影机制</li>
+                        
+                        <li>引入动力学先验辅助策略学习</li>
+                        
+                        <li>采用复合损失函数进行端到端优化</li>
+                        
+                    </ul>
+                    
+
+                    <!-- 实验结论 -->
+                    
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在基准测试中验证了性能优越性。
+                    </div>
+                    
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.12114v1" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.12114v1.pdf" target="_blank">Download PDF</a>
+                        <a href="https://arxiv.org/abs/2610.12114v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                
+                
+            </section>
+            
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">世界模型 & WAM (World Models)</span>
+                    <span class="track-count">1 selected</span>
+                </div>
+
+                
+                
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="https://arxiv.org/abs/2610.12468v1" target="_blank">DreamTrue: Action-Faithful Robot World Model with Counterfactual Post-Training</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        
+                        <a href="https://github.com/haosulab/MPlib" target="_blank" class="badge badge-github">GitHub 开源</a>
+                        
+
+                        <span>发表日期: 2026-10-08</span>
+                        <span>作者: Junyan Li, Ruizhi Li, Yu Liu et al.</span>
+                        <span>arXiv ID: 2610.12468v1</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div>创新性 Novelty</div>
+                            <div class="score-val">8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>工程可行性 Engineering</div>
+                            <div class="score-val">6.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>实验完备性 Empirical</div>
+                            <div class="score-val">9/10</div>
+                        </div>
+                        <div class="score-item" style="border-left: 1px solid #e2e8f0;">
+                            <div>综合指数 Overall</div>
+                            <div class="score-val" style="color: var(--accent);">8.5/10</div>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 白话概要 TL;DR -->
+                    
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>DreamTrue 解决机器人世界模型动作跟随不准和预测偏向成功的问题。它先把不同机器人的动作渲染成统一的图像空间条件（RGB、深度、掩码、相机射线），让视频扩散模型能按动作生成未来多视角画面；再用反事实后训练修改动作轨迹生成各种扰动未来，并用一个视频奖励模型（人类标注机器人、物体、交互缺陷训练）通过强化学习筛选更物理合理的预测。关键概念：反事实推演就是“如果动作变了未来会怎样”，用来补足失败数据；图像空间动作条件是把抽象动作变成视觉图，使跨本体共享同一生成器。
+                    </div>
+                    
+
+                    <!-- 输入与输出定义 -->
+                    
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>多视角初始RGB观测、任务指令、动作序列、机器人URDF及标定参数；训练时还有成对多视角未来视频。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>未来多视角RGB视频。</span>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 核心机制与数学公式 -->
+                    
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        
+                        <li>离线几何标定：用机器人渲染与记录视频的像素、时序背景、跨视角对应关系，联合优化相机参数与臂安装偏移，最小化重投影误差和射线共面误差：$\min_{\Theta,\xi} \lambda_a \langle \|u_i - \pi_i(X_i(s,\xi);\Theta,\xi)\|_2^2 \rangle_{\mathcal{P}_{align}} + \lambda_e \langle |(r_a\times r_b)^\top(o_a-o_b)| \rangle_{\mathcal{P}_{view}\cup\mathcal{P}_{time}}$。</li>
+                        
+                        <li>跨具身统一动作表示：将动作渲染为图像空间条件 $\mathcal{C}=\{(\tilde{R}_t^v,D_t^v,M_t^v,P_t^v)\}$，经VAE和几何编码器后通过VACE分支注入视频DiT，多视角latent按宽度平铺预测未来视频。</li>
+                        
+                        <li>反事实后训练与奖励引导：修改动作轨迹生成更广动作和接触，训练视频奖励模型评估本体、物体、交互缺陷，并用其分数通过强化学习后训练提升物理合理性。</li>
+                        
+                    </ul>
+                    
+
+                    <!-- 实验结论 -->
+                    
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在AgiBot上，完整DreamTrue将反事实动作下的交互缺陷率从48.12%降至6.25%，nDTW达0.8831，并获AgiBot World Challenge 2026世界模型赛道第一。
+                    </div>
+                    
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.12468v1" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.12468v1.pdf" target="_blank">Download PDF</a>
+                        <a href="https://arxiv.org/abs/2610.12468v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                
+                
+            </section>
+            
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">具身智能 & VLA (Vision-Language-Action)</span>
+                    <span class="track-count">1 selected</span>
+                </div>
+
+                
+                
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="https://arxiv.org/abs/2610.12457v1" target="_blank">SpatialHarness: Test-Time Spatial Scaffolding for Fine Robotic Manipulation</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        
+                        <a href="https://github.com/robocurve/inspect-robots" target="_blank" class="badge badge-github">GitHub 开源</a>
+                        
+
+                        <span>发表日期: 2026-10-08</span>
+                        <span>作者: Jiayu Wang, Yue Yu, Bin Zhu et al.</span>
+                        <span>arXiv ID: 2610.12457v1</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div>创新性 Novelty</div>
+                            <div class="score-val">8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>工程可行性 Engineering</div>
+                            <div class="score-val">7/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>实验完备性 Empirical</div>
+                            <div class="score-val">8/10</div>
+                        </div>
+                        <div class="score-item" style="border-left: 1px solid #e2e8f0;">
+                            <div>综合指数 Overall</div>
+                            <div class="score-val" style="color: var(--accent);">8.5/10</div>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 白话概要 TL;DR -->
+                    
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>现有强大多模态基础模型直接控机器人时，精细操作常失败，关键不是策略不会，而是物理相机看不到任务关键的空间关系。SpatialHarness 在测试时维护一个与真实执行同步的在线仿真场景（数字孪生），识别关键空间关系并渲染物理相机之外的互补虚拟视角，作为空间脚手架喂给冻结策略，无需微调或改动硬件。核心直觉：把看不见的几何关系主动显式呈现，就能释放基础模型已经具备的精细操作能力。
+                    </div>
+                    
+
+                    <!-- 输入与输出定义 -->
+                    
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>任务指令、双 Intel RealSense RGB-D 图像（腕部与固定第三人称视角）、机器人关节状态与夹爪宽度、执行反馈；SpatialHarness 额外提供两个虚拟 RGB 视图与物体 6-DoF 位姿。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>七维末端执行器动作增量向量（三维平移增量、三维旋转向量增量与夹爪命令）及动作块长度。</span>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 核心机制与数学公式 -->
+                    
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        
+                        <li>交互感知场景同步按 $m_{i,t}\in\{\text{static},\text{held},\text{transition}\}$ 选择更新：静止对象保持 $p_{i,t}=p_{i,t-1}$，抓取对象由物理引擎传播并经视觉与约束校验，过渡阶段用假设重放 $\tilde{s}_t^{(k)}=f(s_\tau^{(k)},u_{\tau:t})$ 选择与真实执行一致的当前仿真状态。</li>
+                        
+                        <li>初始化时，模型从多视角图像构建 CAD 资产，视觉校正得候选位姿集 $\mathcal{P}_{i,0}$，再生成约束程序 $z_{i,0}=\pi(\mathcal{C}_{i,0})$ 并执行 $p_{i,0}=\phi(\mathcal{P}_{i,0},z_{i,0})$，确定满足关系约束且通过视觉验证的初始 6-DoF 位姿。</li>
+                        
+                        <li>任务导向视角选择由模型在任务前配置互补虚拟视角并渲染，策略每步结合虚拟视图与结构化物体位姿，输出七维动作块 $a=[\delta x,\delta y,\delta z,\delta r_x,\delta r_y,\delta r_z,g]$，块长 $H\in\{10,20,30\}$。</li>
+                        
+                    </ul>
+                    
+
+                    <!-- 实验结论 -->
+                    
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在保持同一冻结 GPT-6 Astra 策略与控制协议下，SpatialHarness 将插头插入成功率从 26.7% 提升到 66.7%，将汉诺塔从 0% 提升到 100%，证明测试时空间可观测性增强可显著释放精细操作能力。
+                    </div>
+                    
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.12457v1" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.12457v1.pdf" target="_blank">Download PDF</a>
+                        <a href="https://arxiv.org/abs/2610.12457v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                
+                
+            </section>
+            
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">端到端自动驾驶 (Autonomous Driving)</span>
+                    <span class="track-count">1 selected</span>
+                </div>
+
+                
+                
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="https://arxiv.org/abs/2610.12266v1" target="_blank">DVD: Dynamic Vector Decoding for Efficient MLLM-based Perception</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        
+
+                        <span>发表日期: 2026-10-08</span>
+                        <span>作者: Jinghua Hou, Zhe Liu, Hengshuang Zhao</span>
+                        <span>arXiv ID: 2610.12266v1</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div>创新性 Novelty</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>工程可行性 Engineering</div>
+                            <div class="score-val">8.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div>实验完备性 Empirical</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item" style="border-left: 1px solid #e2e8f0;">
+                            <div>综合指数 Overall</div>
+                            <div class="score-val" style="color: var(--accent);">8.0/10</div>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 白话概要 TL;DR -->
+                    
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>现有MLLM感知方法要么把2D/3D坐标写成文本（token开销大），要么用固定范围量化（在无界3D场景中精度差）。本文提出动态向量解码（DVD），将2D框、2D掩码和3D框统一转成1D向量序列，再通过一个可学习的码本压缩成紧凑的离散token，就像给每种感知结果分配一个“数字身份证”；推理时MLLM只需输出这些token，一个轻量去token器就能还原出原始坐标或形状。关键突破是引入基于双向Chamfer距离的几何损失，确保还原出的形状在几何结构上忠实于原表示，从而在统一2D/3D任务的同时大幅减少token数量和推理延迟。
+                    </div>
+                    
+
+                    <!-- 输入与输出定义 -->
+                    
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>输入：2D任务为单目RGB图像，3D任务为RGB-D图像或点云，并附带自然语言指令（如指代表达式或类别查询）。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>输出：2D边界框坐标、2D掩码多边形顶点序列、或3D边界框参数（中心坐标、尺寸、旋转矩阵）。</span>
+                        </div>
+                    </div>
+                    
+
+                    <!-- 核心机制与数学公式 -->
+                    
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        
+                        <li>将2D边界框（左上右下角点）、2D掩码（沿边缘均匀采样的归一化点序列）和3D边界框（中心、尺寸、旋转矩阵）统一展平为1D向量序列 $\mathbf{s} \in \mathbb{R}^{B \times L \times 1}$，经1D编码器映射到潜在空间 $\mathbf{z} = E(\mathbf{s})$，再通过可学习码本量化得到离散token，最后由1D解码器重建 $\hat{\mathbf{s}} = D(\text{Quantize}(\mathbf{z}))$。</li>
+                        
+                        <li>引入任务无关的几何损失 $\mathcal{L}_{\text{geo}}$，基于双向Chamfer距离计算预测与目标点集（或3D框顶点）之间的平均最小L1距离，该损失对点序排列不变，克服了L1重建损失对参数化顺序敏感的缺陷，统一监督2D和3D感知任务。</li>
+                        
+                        <li>训练时扩展MLLM词表并微调，推理时仅需一个轻量去token器将MLLM输出的离散token解码回原始2D/3D表示，无需修改MLLM架构，显著降低序列长度和推理延迟。</li>
+                        
+                    </ul>
+                    
+
+                    <!-- 实验结论 -->
+                    
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在3D接地任务SUN-RGBD上，DVD-2B达到40.0 AP3D@15，比Qwen3-VL-8B的36.2提升3.8，同时大幅减少token开销；在2D接地和指代分割任务上也全面超越基线，验证了统一离散表示的高效性与精度。
+                    </div>
+                    
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.12266v1" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.12266v1.pdf" target="_blank">Download PDF</a>
+                        <a href="https://arxiv.org/abs/2610.12266v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                
+                
+            </section>
+            
+        </main>
+
+        <footer class="footer">
+            由 GitHub Actions 自动化生成 &bull; DeepSeek Flash 深度研读 &bull; KaTeX 原生数学渲染
+        </footer>
+    </div>
+</body>
+</html>
