@@ -118,13 +118,13 @@ def main():
             tz_beijing).strftime('%Y-%m-%d %H:%M:%S')
 
         github_output = os.environ.get('GITHUB_OUTPUT', 'local_output.txt')
-        # 写入环境变量文件
+        # 写入环境变量文件 (下载的文件保存在当前工作目录，直接提供文件名即可)
         with open(github_output, 'a') as f:
             f.write(f"new_version={current_version}\n")
             f.write(f"tag_name={tag_name}\n")
             f.write("zip_files<<EOF\n")
             for p in processed_files:
-                f.write(f"ffmpeg-mirror/{p}\n")
+                f.write(f"{p}\n")
             f.write("EOF\n")
             f.write(f"sync_time={now_beijing}\n")  # 输出北京时间
         print(f"任务完成。版本: {current_version}, 文件: {processed_files}")
