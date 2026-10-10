@@ -14,11 +14,11 @@ def send_email_html(subject: str, html_content: str, preview_path: str = "previe
     通用 Gmail 邮件发送工具。
     若未检测到凭证，自动保存为本地 HTML 预览文件，避免报错退出。
     """
-    gmail_user = os.getenv("GMAIL_USER")
-    gmail_pass = os.getenv("GMAIL_APP_PASS")
-    if gmail_pass:
-        gmail_pass = gmail_pass.replace(" ", "").strip()
-    receiver = os.getenv("NOTIFICATION_EMAIL", gmail_user)
+    gmail_user = (os.getenv("GMAIL_USER") or "").strip()
+    gmail_pass = (os.getenv("GMAIL_APP_PASS") or "").replace(" ", "").strip()
+    receiver = (os.getenv("NOTIFICATION_EMAIL") or "").strip()
+    if not receiver:
+        receiver = gmail_user
 
     if not gmail_user or not gmail_pass:
         print(f"⚠️ [提示] 未配置 GMAIL_USER 或 GMAIL_APP_PASS，将保存为本地预览文件: {preview_path}")
