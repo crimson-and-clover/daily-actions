@@ -40,9 +40,34 @@ TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "template.html")
 SRC_DIR = os.path.dirname(os.path.dirname(__file__))
 REPO_ROOT = os.path.dirname(SRC_DIR)
 TEMPLATE_PORTAL_FILE = os.path.join(REPO_ROOT, "template_portal.html")
+TEMPLATE_SECTION_INDEX_FILE = os.path.join(REPO_ROOT, "template_section_index.html")
 DOCS_ROOT = os.path.join(REPO_ROOT, "docs")
 DOCS_DIR = os.path.join(DOCS_ROOT, "world-news")
 PAGES_BASE_URL = os.getenv("PAGES_BASE_URL", "https://crimson-and-clover.github.io/daily-actions")
+
+
+def render_section_index(title, badge, description, latest_date, latest_title, archives_dir):
+    """渲染专区索引目录页面"""
+    archives = []
+    if os.path.exists(archives_dir):
+        files = sorted(os.listdir(archives_dir), reverse=True)
+        for f in files:
+            if f.endswith(".html"):
+                d = f[:-5]
+                archives.append({"date": d, "summary": f"{d} 深度情报内参"})
+    
+    if os.path.exists(TEMPLATE_SECTION_INDEX_FILE):
+        with open(TEMPLATE_SECTION_INDEX_FILE, "r", encoding="utf-8") as tf:
+            tpl = Template(tf.read())
+            return tpl.render(
+                title=title,
+                badge=badge,
+                description=description,
+                latest_date=latest_date,
+                latest_title=latest_title,
+                archives=archives
+            )
+    return "<h1>Index template missing</h1>"
 
 
 def clean_html(raw_html: str) -> str:
@@ -439,23 +464,29 @@ def main():
 
     date_str = now_bjt.strftime("%Y-%m-%d")
 
-    # 1. 生成并保存 GitHub Pages 静态站点文档 (docs/world-news/index.html & docs/world-news/archives/{date}.html)
-    os.makedirs(DOCS_DIR, exist_ok=True)
-    web_html = build_html_report(macro_items, tech_items, ai_analysis, pages_url=None)
-    index_path = os.path.join(DOCS_DIR, "index.html")
-    with open(index_path, "w", encoding="utf-8") as f:
-        f.write(web_html)
-    print(f"[网页生成] GitHub Pages 主页已保存: {index_path}")
-
-    # 同时按日期归档
+    # 1. 保存当日内参详情页面到 archives/{date}.html
     archive_dir = os.path.join(DOCS_DIR, "archives")
     os.makedirs(archive_dir, exist_ok=True)
     date_path = os.path.join(archive_dir, f"{date_str}.html")
     with open(date_path, "w", encoding="utf-8") as f:
         f.write(web_html)
-    print(f"[网页生成] 历史归档已保存: {date_path}")
+    print(f"[网页生成] 内参正文已保存至归档: {date_path}")
 
-    # 2. 生成或更新 GitHub Pages 根目录导航页 (docs/index.html)
+    # 2. 渲染专区聚合索引页到 world-news/index.html
+    section_index_html = render_section_index(
+        title="全球宏观、市场与计算开源内参",
+        badge="CI: WORLD NEWS & INTELLIGENCE",
+        description="多源一手聚合、LLM Impact Score 严格量化评级、资本市场与资产定价传导逻辑深度推演。",
+        latest_date=date_str,
+        latest_title=f"全球宏观政经与开源内参 ({date_str})",
+        archives_dir=archive_dir
+    )
+    index_path = os.path.join(DOCS_DIR, "index.html")
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write(section_index_html)
+    print(f"[网页生成] 资讯专区索引主页已更新: {index_path}")
+
+    # 3. 生成或更新 GitHub Pages 根目录导航页 (docs/index.html)
     root_index_path = os.path.join(DOCS_ROOT, "index.html")
     if os.path.exists(TEMPLATE_PORTAL_FILE):
         with open(TEMPLATE_PORTAL_FILE, "r", encoding="utf-8") as f:
@@ -465,8 +496,8 @@ def main():
             f.write(portal_html)
         print(f"[门户生成] 根目录多CI导航主页已更新: {root_index_path}")
 
-    # 3. 生成邮件版本 HTML (包含指向 GitHub Pages 的链接)
-    pages_today_url = f"{PAGES_BASE_URL.rstrip('/')}/world-news/index.html"
+    # 4. 生成邮件版本 HTML (包含指向 GitHub Pages 具体研报的链接)
+    pages_today_url = f"{PAGES_BASE_URL.rstrip('/')}/world-news/archives/{date_str}.html"
     email_html = build_html_report(macro_items, tech_items, ai_analysis, pages_url=pages_today_url)
 
     # 4. 发送邮件并写入本地预览

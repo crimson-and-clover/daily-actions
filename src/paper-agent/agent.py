@@ -37,9 +37,34 @@ TEMPLATE_WEB_FILE = os.path.join(os.path.dirname(__file__), "template_web.html")
 SRC_DIR = os.path.dirname(os.path.dirname(__file__))
 REPO_ROOT = os.path.dirname(SRC_DIR)
 TEMPLATE_PORTAL_FILE = os.path.join(REPO_ROOT, "template_portal.html")
+TEMPLATE_SECTION_INDEX_FILE = os.path.join(REPO_ROOT, "template_section_index.html")
 DOCS_ROOT = os.path.join(REPO_ROOT, "docs")
 DOCS_DIR = os.path.join(DOCS_ROOT, "paper-agent")
 PAGES_BASE_URL = os.getenv("PAGES_BASE_URL", "https://crimson-and-clover.github.io/daily-actions")
+
+
+def render_section_index(title, badge, description, latest_date, latest_title, archives_dir):
+    """渲染专区索引目录页面"""
+    archives = []
+    if os.path.exists(archives_dir):
+        files = sorted(os.listdir(archives_dir), reverse=True)
+        for f in files:
+            if f.endswith(".html"):
+                d = f[:-5]
+                archives.append({"date": d, "summary": f"{d} 深度研报"})
+    
+    if os.path.exists(TEMPLATE_SECTION_INDEX_FILE):
+        with open(TEMPLATE_SECTION_INDEX_FILE, "r", encoding="utf-8") as tf:
+            tpl = Template(tf.read())
+            return tpl.render(
+                title=title,
+                badge=badge,
+                description=description,
+                latest_date=latest_date,
+                latest_title=latest_title,
+                archives=archives
+            )
+    return "<h1>Index template missing</h1>"
 
 
 
@@ -475,27 +500,33 @@ def main():
     date_str = now_bjt.strftime("%Y-%m-%d")
     tracks_data = prepare_tracks_data(track_results)
 
-    # 1. 生成并保存 GitHub Pages 静态站点文档 (docs/index.html & docs/archives/...)
-    os.makedirs(DOCS_DIR, exist_ok=True)
-    web_html = render_web_report_html(tracks_data, total_analyzed, date_str)
-    index_path = os.path.join(DOCS_DIR, "index.html")
-    with open(index_path, "w", encoding="utf-8") as f:
-        f.write(web_html)
-    print(f"[网页生成] GitHub Pages 主页已保存: {index_path}")
-
-    # 同时按日期归档
+    # 1. 保存当日研报详情页面到 archives/{date}.html
     archive_dir = os.path.join(DOCS_DIR, "archives")
     os.makedirs(archive_dir, exist_ok=True)
     date_path = os.path.join(archive_dir, f"{date_str}.html")
     with open(date_path, "w", encoding="utf-8") as f:
         f.write(web_html)
-    print(f"[网页生成] 历史归档已保存: {date_path}")
+    print(f"[网页生成] 研报正文已保存至归档: {date_path}")
 
-    # 2. 生成邮件版本 HTML (极简风格 + 导流到 GitHub Pages paper-agent 专区)
-    pages_today_url = f"{PAGES_BASE_URL.rstrip('/')}/paper-agent/index.html"
+    # 2. 渲染专区聚合索引页到 paper-agent/index.html
+    section_index_html = render_section_index(
+        title="AI 前沿学术研报",
+        badge="CI: RESIDENT PAPER AGENT",
+        description="自动驾驶、世界模型、WAM、具身智能与 VLA 策略的高清公式精读与各维度量化评估。",
+        latest_date=date_str,
+        latest_title=f"AI 前沿学术研报 ({date_str})",
+        archives_dir=archive_dir
+    )
+    index_path = os.path.join(DOCS_DIR, "index.html")
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write(section_index_html)
+    print(f"[网页生成] 论文专区索引主页已更新: {index_path}")
+
+    # 3. 生成邮件版本 HTML (指向专区索引或当日详情)
+    pages_today_url = f"{PAGES_BASE_URL.rstrip('/')}/paper-agent/archives/{date_str}.html"
     email_html = render_email_report_html(tracks_data, total_analyzed, date_str, pages_url=pages_today_url)
 
-    # 3. 生成或更新 GitHub Pages 根目录导航页 (docs/index.html)，从独立模板渲染
+    # 4. 生成或更新 GitHub Pages 根目录导航页 (docs/index.html)，从独立模板渲染
     root_index_path = os.path.join(DOCS_ROOT, "index.html")
     if os.path.exists(TEMPLATE_PORTAL_FILE):
         with open(TEMPLATE_PORTAL_FILE, "r", encoding="utf-8") as f:
