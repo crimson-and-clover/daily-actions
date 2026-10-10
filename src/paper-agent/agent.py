@@ -31,11 +31,15 @@ from html_reader import extract_full_paper
 BJT = timezone(timedelta(hours=8))
 now_bjt = datetime.now(BJT)
 
-MEMORY_FILE = os.path.join(os.path.dirname(__file__), "memory", "history.json")
-TEMPLATE_EMAIL_FILE = os.path.join(os.path.dirname(__file__), "template_email.html")
-TEMPLATE_WEB_FILE = os.path.join(os.path.dirname(__file__), "template_web.html")
 SRC_DIR = os.path.dirname(os.path.dirname(__file__))
 REPO_ROOT = os.path.dirname(SRC_DIR)
+# 优先从独立 state/ 目录读取（CI 或多任务环境），兼容本地单独测试
+STATE_PAPER_DIR = os.path.join(REPO_ROOT, "state", "paper-agent")
+LOCAL_MEMORY_DIR = os.path.join(os.path.dirname(__file__), "memory")
+MEMORY_DIR = STATE_PAPER_DIR if os.path.exists(os.path.join(REPO_ROOT, "state")) else LOCAL_MEMORY_DIR
+MEMORY_FILE = os.path.join(MEMORY_DIR, "history.json")
+TEMPLATE_EMAIL_FILE = os.path.join(os.path.dirname(__file__), "template_email.html")
+TEMPLATE_WEB_FILE = os.path.join(os.path.dirname(__file__), "template_web.html")
 TEMPLATE_PORTAL_FILE = os.path.join(REPO_ROOT, "template_portal.html")
 TEMPLATE_SECTION_INDEX_FILE = os.path.join(REPO_ROOT, "template_section_index.html")
 DOCS_ROOT = os.path.join(REPO_ROOT, "docs")
