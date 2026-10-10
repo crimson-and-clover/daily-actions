@@ -344,19 +344,19 @@
                     <div class="score-bar">
                         <div class="score-item">
                             <div>创新性 Novelty</div>
-                            <div class="score-val">7.5/10</div>
+                            <div class="score-val">8/10</div>
                         </div>
                         <div class="score-item">
                             <div>工程可行性 Engineering</div>
-                            <div class="score-val">5.0/10</div>
+                            <div class="score-val">4/10</div>
                         </div>
                         <div class="score-item">
                             <div>实验完备性 Empirical</div>
-                            <div class="score-val">9.0/10</div>
+                            <div class="score-val">9/10</div>
                         </div>
                         <div class="score-item" style="border-left: 1px solid #e2e8f0;">
                             <div>综合指数 Overall</div>
-                            <div class="score-val" style="color: var(--accent);">8.5/10</div>
+                            <div class="score-val" style="color: var(--accent);">8/10</div>
                         </div>
                     </div>
                     
@@ -364,7 +364,7 @@
                     <!-- 白话概要 TL;DR -->
                     
                     <div class="tldr-box">
-                        <strong>白话概述：</strong>这篇论文追问：把 3 万小时第一人称人类视频喂给视频世界模型，它到底能学会什么。所谓世界模型，就是让 AI 在脑子里预演未来画面的生成模型；他们用 Cosmos 3 视频扩散模型，根据初始画面、语言指令和动作序列预测未来视频，并用骨架条件把人的身体关节位置直接告诉模型，让它不必自己猜身体怎么动，从而单独衡量它对手中物体运动的理解。结果发现：数据量主要把智能体自身的渲染推向极限，却很难学会物体交互动力学；要缩小这个差距，关键不在继续加数据，而在改变训练监督和条件设计。
+                        <strong>白话概述：</strong>世界模型就是能根据当前画面和动作“脑补”接下来画面的神经网络。本文用3万小时第一人称（头戴相机）人类视频训练它，却发现一个尴尬事实：模型能把“人自己的身体怎么动”学得很像，却学不会“手里的物体在被碰到后怎么反应”。作者直接把人体骨架投影喂给模型，相当于替它把“手在哪、胳膊怎么摆”答好，从而单独测出物体这条轴的上限极低；再试着把学习重点从画面外观转向物体动力学，虽有改善但仍差得远。结论是：自我中心视频能把智能体建模推向极限，但世界的响应规律不是靠堆数据就能学会的。
                     </div>
                     
 
@@ -373,11 +373,11 @@
                     <div class="io-box">
                         <div class="io-row">
                             <span class="io-label">输入 Input:</span>
-                            <span>初始单目 RGB 图像、文本描述、智能体动作序列（含相机与手腕 6D 位姿、双手各 20 个关节、肩肘等 159 维状态及其差分），可选投影骨架序列。</span>
+                            <span>初始单目RGB画面、文本描述、智能体运动序列（相机与左右手腕6自由度位姿、双手各20个关节位置、肩肘位姿）；可选骨架序列作为视觉条件。</span>
                         </div>
                         <div class="io-row">
                             <span class="io-label">输出 Output:</span>
-                            <span>未来单目 RGB 视频帧序列，或其在冻结 VAE 潜空间中的未来视频潜变量。</span>
+                            <span>未来多帧第一人称RGB视频，用于直接评估智能体身体与被操作物体的渲染保真度。</span>
                         </div>
                     </div>
                     
@@ -387,11 +387,11 @@
                     <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
                     <ul class="tech-list">
                         
-                        <li>基于 Cosmos 3 视频扩散世界模型：给定初始帧 $x_0$、文本 $c$ 与动作序列 $a_{0:T}$，冻结 VAE 将视频编码为潜变量 $z=\mathcal{E}(x_{0:T})$，并以 rectified flow 损失 $\mathcal{L}_{\mathrm{FM}}=\mathbb{E}[\lVert M^{\mathrm{pred}}\odot(v_\theta(z_\sigma,\sigma;c,a_{0:T})-(\epsilon-z))\rVert_2^2]$ 训练未来帧潜空间去噪。</li>
+                        <li>骨架条件：把相机内参投影出的骨架序列经冻结VAE编码，再通过零初始化投影加到视频latent上，使模型无需从动作token反推身体姿态，从而提前饱和智能体轴、暴露物体轴瓶颈。</li>
                         
-                        <li>动作空间扩展为 $s_t=[c_t,w_t^L,w_t^R,h_t^L,h_t^R,b_t]\in\mathbb{R}^{159}$，其中相机与手腕位姿含 3D 平移和 6D 旋转，双手各 20 个关节位于对应手腕坐标系；模型对绝对状态 $s_0$ 与差分 $s_t-s_{t-1}$ 归一化后线性编码为动作 token，并在去噪中保持 clean。</li>
+                        <li>动作空间扩展为 $s_t \in \mathbb{R}^{159}$，经归一化与一阶差分后线性编码为动作token；以rectified flow matching训练，$z_\sigma = z + \sigma M^{\mathrm{pred}} \odot (\epsilon - z)$，$\mathcal{L}_{\mathrm{FM}} = \mathbb{E}[\| M^{\mathrm{pred}} \odot (v_\theta(z_\sigma,\sigma;c,a_{0:T})-(\epsilon-z)) \|_2^2]$。</li>
                         
-                        <li>骨架条件把投影骨架序列 $S_{0:T}$ 经同一冻结 VAE 编码，并通过零初始化投影 $W_s$ 加到对应视频嵌入，使模型直接获知身体构型，从而隔离智能体保真度并单独测量物体交互动力学保真度与饱和点。</li>
+                        <li>动态区域监督：用D4RT在首帧规则网格上跟踪查询点，结合3D位移、跟踪可靠性与手部投影软先验定位交互区域，把模型容量从场景外观转向物体动力学。</li>
                         
                     </ul>
                     
@@ -400,7 +400,7 @@
                     
                     <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
                     <div class="takeaway-box">
-                        在 300 到 30,000 小时数据扩展下，智能体保真度趋近约 0.811 SCS 且骨架条件仅用 300 小时即达基线约 15k 小时水平，而物体交互保真度仅提升 0.09 SCS、饱和点约 0.565 SCS，模型参数扩大 4 倍也只把物体天花板提高 0.034 SCS，说明单纯扩数据与扩模型无法弥补智能体与物体动力学建模差距。
+                        3万小时数据下智能体保真度趋于饱和（约0.811 SCS，骨架条件仅需约1/50数据即可达到），而物体保真度上限仅约0.565 SCS，模型扩大4倍仅提升0.034 SCS，表明数据与模型规模均无法弥合交互建模差距。
                     </div>
                     
 
@@ -444,11 +444,11 @@
                         </div>
                         <div class="score-item">
                             <div>工程可行性 Engineering</div>
-                            <div class="score-val">7.5/10</div>
+                            <div class="score-val">7/10</div>
                         </div>
                         <div class="score-item">
                             <div>实验完备性 Empirical</div>
-                            <div class="score-val">8.5/10</div>
+                            <div class="score-val">8/10</div>
                         </div>
                         <div class="score-item" style="border-left: 1px solid #e2e8f0;">
                             <div>综合指数 Overall</div>
@@ -460,7 +460,7 @@
                     <!-- 白话概要 TL;DR -->
                     
                     <div class="tldr-box">
-                        <strong>白话概述：</strong>现有VLA把训练时的相机数量与位姿写死在输入里，部署时加相机、挪相机或换视角，视觉token结构不匹配就会性能崩溃。VersaCamVLA把“相机集合表示”与“动作学习”解耦：先用目标视角预测训练场景编码器，把任意非空、带位姿的RGB视图集合压成固定长度潜空间场景token $\mathbf{Z}_t$，其大小与相机数量 $N$ 无关；再用轻量空间编码器把token作为补充视觉条件注入预训练VLA。目标视角预测即让编码器从潜token重建其他视角的RGB/语义/边缘，逼它掌握空间一致场景信息；WAPS即利用腕部相机自然运动采样额外目标位姿，免费扩充相机配置覆盖。部署时无需显式3D传感或新视角渲染。
+                        <strong>白话概述：</strong>传统 VLA 把相机数量与位姿固定写进策略输入，部署时加相机、移相机就容易失效；VersaCamVLA 把“看哪些相机”和“怎么动手”解耦：任意一组带位姿 RGB 视图先被压成固定长度的潜场景 token，再作为补充视觉条件注入预训练 VLA。潜场景 token 相当于把多视角观察压缩成定长“场景摘要”，目标视图预测则像让模型从已有视角想象新视角的 RGB、语义和边缘，从而逼摘要记住跨视角空间结构；WAPS 用腕部相机随机械臂运动产生的自然位姿免费扩充相机配置。突破点是不依赖显式 3D 传感或新视角渲染，也能适应可变相机数量与未见相机位姿。
                     </div>
                     
 
@@ -469,11 +469,11 @@
                     <div class="io-box">
                         <div class="io-row">
                             <span class="io-label">输入 Input:</span>
-                            <span>语言指令 $\mathcal{L}$、可变数量且带相机内参/外参的RGB图像集合 $\mathcal{V}_t^{\mathcal{C}}=(\mathbf{I}_t^i,\mathbf{K}^i,\mathbf{T}^i)_{i=1}^{N}$（部署时相机数量与位姿可变化），以及机器人本体感知状态 $\mathcal{P}_t$（关节角、夹爪状态等）。</span>
+                            <span>语言指令；可变数量带内参和外参的 RGB 视图（单目、多目或含腕部相机）；机器人本体感知状态（双臂关节角与夹爪状态）。</span>
                         </div>
                         <div class="io-row">
                             <span class="io-label">输出 Output:</span>
-                            <span>双臂机器人关节空间动作块 $A_t=[a_t,a_{t+1},\ldots,a_{t+H_a-1}]$，每步14维，含左/右臂各6个关节角与夹爪开合状态，由VLA动作专家以流匹配去噪生成。</span>
+                            <span>未来动作块，默认预测 $H=50$ 步；每步为双臂 14 维关节空间动作，包括左右臂各 6 个关节角和夹爪开合状态。</span>
                         </div>
                     </div>
                     
@@ -483,11 +483,11 @@
                     <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
                     <ul class="tech-list">
                         
-                        <li>用Plücker光线嵌入与RGB图像块拼接，投影为源token $x^{i,j}=\phi_{\mathrm{src}}([\mathbf{I}^{i,j},\mathbf{R}^{i,j}])$，再用可学习查询把可变长度源序列聚合为固定大小场景token $\mathbf{Z}_t$，其尺寸与相机数 $N$ 无关。</li>
+                        <li>将每视角 RGB 与 Plücker 射线嵌入拼接后 patch 化，场景编码器聚合为固定长度潜 token $\mathbf{Z}_t$；训练期解码器在目标视角预测 RGB、语义和边缘，迫使 $\mathbf{Z}_t$ 保留跨视角空间信息。</li>
                         
-                        <li>Stage I仅训练时以目标相机光线查询 $\mathbf{Z}$，重建RGB、语义和边缘，迫使潜空间token保持跨视角空间一致性；WAPS利用腕部相机运动采样额外目标位姿，免费扩充相机配置覆盖。</li>
+                        <li>WAPS：把腕部相机随机械臂运动产生的自然位姿当作额外相机配置，扩充训练覆盖，提升对未见相机位姿的泛化。</li>
                         
-                        <li>Stage II冻结场景编码器、丢弃解码器，用轻量空间编码器将 $\mathbf{Z}$ 压缩为补充视觉条件注入预训练VLA $\pi_{0.5}$；动作专家以流匹配目标预测连续动作块 $A_t=\pi(\mathcal{L},\mathcal{V}_t^{\mathcal{C}},\mathcal{P}_t)$。</li>
+                        <li>两阶段注入：Stage II 冻结场景编码器并丢弃解码器，用轻量空间编码器压缩 $\mathbf{Z}_t$ 作为补充视觉条件注入预训练 VLA $\pi_{0.5}$，以 flow-matching 生成动作块 $A_t$。</li>
                         
                     </ul>
                     
@@ -496,7 +496,7 @@
                     
                     <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
                     <div class="takeaway-box">
-                        在RoboTwin 2.0、LIBERO和真实Cobot Magic上，VersaCamVLA一致优于$\pi_{0.5}$与直接多视角基线，并在相机数3/4扩展到5/6及未见位姿扰动下保持鲁棒；消融中WAPS将未见位姿平均成功率从48.79%提升至52.63%，192个场景token与卷积空间编码器达55.63%最佳平均成功率。
+                        在 RoboTwin 2.0、LIBERO 和真实机器人上，VersaCamVLA 在相机数量变化与未见相机位姿下持续优于固定相机 VLA 和直接多视图基线；WAPS 将未见位姿平均成功率从 48.79% 提升到 52.63%，192 个场景 token 取得最佳平均成功率 55.63%。
                     </div>
                     
 
@@ -536,11 +536,11 @@
                     <div class="score-bar">
                         <div class="score-item">
                             <div>创新性 Novelty</div>
-                            <div class="score-val">6.5/10</div>
+                            <div class="score-val">6.0/10</div>
                         </div>
                         <div class="score-item">
                             <div>工程可行性 Engineering</div>
-                            <div class="score-val">7.5/10</div>
+                            <div class="score-val">8.0/10</div>
                         </div>
                         <div class="score-item">
                             <div>实验完备性 Empirical</div>
@@ -556,7 +556,7 @@
                     <!-- 白话概要 TL;DR -->
                     
                     <div class="tldr-box">
-                        <strong>白话概述：</strong>这篇论文不提出新规划器，而是搭建统一基准，让经典规划与 PPO 学习策略在相同的动态危险场、运动约束、信息可见性和评价指标下公平对比。动态危险场可理解为若干像旋转喷水器一样的扇形禁入区不断扫过空间，有限可见性指智能体只能看到周围局部地图，障碍角速度随机则意味着未来禁区位置无法提前算准，只能在线估计和反应。核心发现是：确定性环境下经典 A*/GBFS 几乎必胜但可能算得很慢；一旦障碍演化随机，在线搜索对计算预算极度敏感，而 PPO 把场景分布训练成快速反应策略，在低延迟下取得更高成功率和更短路径，说明障碍演化的不确定性比部分可观测更决定哪种范式有效。
+                        <strong>白话概述：</strong>本文不提出新规划器，而是构建统一基准，对比经典规划与学习型策略（PPO）在动态旋转喷洒障碍环境中的实时运动规划表现。环境中的障碍像旋转喷水器，扫出的扇形区域随时间变化形成禁行区；智能体必须保持恒速且只能从 7 个固定转向角中选择，随机模式下障碍旋转速度会随机波动，有限视野下只能看到半径 20 的局部区域。核心发现：障碍演化的不确定性（随机 vs 确定）比部分可观测性（局部 vs 全局视野）更能决定哪种方法有效——确定场景下经典 A* 几乎完美但很慢，随机场景下 PPO 以毫秒级延迟达到高成功率。
                     </div>
                     
 
@@ -565,11 +565,11 @@
                     <div class="io-box">
                         <div class="io-row">
                             <span class="io-label">输入 Input:</span>
-                            <span>智能体状态 $(x_t,y_t,\theta_t,t)$；全可见时完整动态障碍/自由空间 $\mathcal{F}(t)$，有限可见时以智能体为中心半径 $V=20$ 的局部自由空间/障碍观测；以及历史帧栈。</span>
+                            <span>智能体当前位置、朝向、时间步，以及障碍/自由空间信息；全局可见时输入完整时变障碍集，有限可见时输入以智能体为中心半径 20 的局部观测，RL 使用帧堆叠。</span>
                         </div>
                         <div class="io-row">
                             <span class="io-label">输出 Output:</span>
-                            <span>每个决策步的离散转向角增量 $a_t=\Delta\theta_t$，在恒速单位步长下产生下一时刻位姿与实时无碰撞轨迹。</span>
+                            <span>经典规划输出时空路径或重规划后的路径；学习策略输出 7 档离散转向增量（$ -45^\circ $ 至 $ 45^\circ $），每 5 步决策一次，形成恒速、有界转角的连续轨迹。</span>
                         </div>
                     </div>
                     
@@ -579,11 +579,11 @@
                     <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
                     <ul class="tech-list">
                         
-                        <li>统一形式化：工作空间 $W\subset\mathbb{R}^2$，动态障碍 $O(t)$ 使自由空间 $\mathcal{F}(t)$ 时变；状态为 $(x_t,y_t,\theta_t,t)$，恒速约束 $\|(x_{t+1},y_{t+1})-(x_t,y_t)\|=1$，动作为 $a_t=\Delta\theta_t\in\{-45^\circ,-30^\circ,-15^\circ,0^\circ,15^\circ,30^\circ,45^\circ\}$。</li>
+                        <li>统一四象限基准：正交组合可见性（全局 vs 半径 20 局部）与障碍角速度（恒定 vs 随机游走），所有方法共享恒速约束 $\|(x_{t+1},y_{t+1})-(x_t,y_t)\|=1$ 和 7 个离散转向动作 $a_t = \Delta\theta_t \in \{-45^\circ,-30^\circ,-15^\circ,0^\circ,15^\circ,30^\circ,45^\circ\}$，以隔离动态不确定性与部分可观测性。</li>
                         
-                        <li>经典基线按信息条件匹配：确定性全可见用 A*/GBFS 搜时空图 $(x,y,\theta,t)$；有限可见用 D*-like 在线重规划；随机角速度用 UCT 采样前瞻，叶节点以到目标欧氏距离评估。</li>
+                        <li>经典基线：确定性下用 A*/GBFS 在时空状态 $(x,y,\theta,t)$ 上搜索；有限可见下用 D*-like 在线重规划；随机动力学下用 UCT 对采样未来障碍轨迹做 anytime 预算控制。</li>
                         
-                        <li>学习策略用 PPO 在相同场景分布训练，使用帧堆叠并每 $k=5$ 步选动作，与经典方法在同随机种子、400 步截断下比较成功率、路径长度和重规划延迟。</li>
+                        <li>学习基线：PPO 在相同场景分布上训练，以帧堆叠的局部观测和 7 档离散转向为输入输出，每 $k=5$ 步选一次动作，用 GPU/CPU 推理实现约毫秒级实时闭环。</li>
                         
                     </ul>
                     
@@ -592,7 +592,7 @@
                     
                     <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
                     <div class="takeaway-box">
-                        确定性下 A* 成功率 $100\%$、平均路径 $114.38$、离线规划约 $38.56$ s；随机动态下 UCT 预算从 $0.002$ s 增到 $1$ s 仅把成功率从 $3.9\%$ 提到 $75.6\%$ 且路径从 $136.92$ 增至 $198.75$，而 PPO 以约 $0.0016$ s GPU 延迟达到 $76.3\%$ 成功率与 $152.26$ 路径，表明障碍演化不确定性是主导因素。
+                        在确定性障碍下经典 A* 达 100% 成功率且路径更短（114.38 vs RL 135.06），但随机障碍下 UCT 对预算极端敏感（0.002s 仅 3.9% 成功，1s 75.6%），PPO 以约 1.6ms 重规划时间达到 76.3% 成功率且路径更优，表明障碍演化不确定性比部分可观测性更决定规划范式选择。
                     </div>
                     
 
