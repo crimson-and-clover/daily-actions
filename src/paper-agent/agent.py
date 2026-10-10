@@ -508,6 +508,7 @@ def main():
     archive_dir = os.path.join(DOCS_DIR, "archives")
     os.makedirs(archive_dir, exist_ok=True)
     date_path = os.path.join(archive_dir, f"{date_str}.html")
+    web_html = render_web_report_html(tracks_data, total_analyzed, date_str)
     with open(date_path, "w", encoding="utf-8") as f:
         f.write(web_html)
     print(f"[网页生成] 研报正文已保存至归档: {date_path}")
