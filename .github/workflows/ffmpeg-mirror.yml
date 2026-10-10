@@ -1,0 +1,51 @@
+name: FFmpeg Auto Sync
+
+on:
+  schedule:
+    - cron: "0 2 * * 0" # 每周日北京时间上午10点运行 (UTC 2:00)
+  workflow_dispatch: # 允许手动点击运行
+
+permissions:
+  contents: write # 必须配置，否则 Action 没有权限创建 Release
+
+jobs:
+  sync-ffmpeg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Run Sync Script
+        id: sync_script
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run python src/ffmpeg-mirror/sync-ffmpeg.py
+
+      - name: Create GitHub Release
+        # 只有当脚本输出了 new_version 时才执行
+        if: steps.sync_script.outputs.new_version != ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.sync_script.outputs.tag_name }}
+          name: FFmpeg Windows Build ${{ steps.sync_script.outputs.new_version }}
+          # 脚本中用空格分隔的文件列表会被正确识别
+          files: ${{ steps.sync_script.outputs.zip_files }}
+          body: |
+            ## FFmpeg 自动更新
+            - **版本号**: ${{ steps.sync_script.outputs.new_version }}
+            - **构建来源**: gyan.dev
+            - **更新时间**: ${{ steps.sync_script.outputs.sync_time }}
+          draft: false
+          prerelease: false

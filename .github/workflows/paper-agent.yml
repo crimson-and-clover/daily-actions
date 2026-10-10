@@ -1,0 +1,60 @@
+name: Resident Paper Agent (AI Frontier Research)
+
+on:
+  schedule:
+    # UTC 00:30 (周一至周五) -> 北京时间 周一至周五 08:30 (晨间学术研读)
+    - cron: '30 0 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-paper-agent:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code (master)
+        uses: actions/checkout@v7
+
+      - name: Checkout Agent State (agent-state branch)
+        uses: actions/checkout@v7
+        with:
+          ref: agent-state
+          path: src/paper-agent/memory
+        continue-on-error: true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Run Resident Paper Agent
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASS: ${{ secrets.GMAIL_APP_PASS }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          PAGES_BASE_URL: https://crimson-and-clover.github.io/daily-actions
+        run: |
+          uv run python src/paper-agent/agent.py
+
+      - name: Deploy to GitHub Pages (gh-pages orphan branch)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
+          keep_files: true
+
+      - name: Commit and push memory updates to agent-state branch
+        working-directory: src/paper-agent/memory
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "Resident Agent [Antigravity]"
+          git add history.json
+          git diff --staged --quiet || git commit -m "chore(agent): update paper memory state [skip ci]"
+          git push origin agent-state

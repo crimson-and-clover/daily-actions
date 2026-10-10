@@ -1,0 +1,31 @@
+name: Market & Travel FX Daily Brief
+
+on:
+  schedule:
+    # UTC 22:00 (周一至周五) -> 北京时间 周二至周六 06:00 (美股周一至周五收盘后)
+    - cron: '0 22 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  run-market-fx:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Run Market & FX Report
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASS: ${{ secrets.GMAIL_APP_PASS }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+        run: |
+          uv run python src/market-fx/report.py
