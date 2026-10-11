@@ -2,49 +2,68 @@
 
 # ⚡ Daily Actions
 
-**自动化日常作业系统与个人智能特工集群**
+**个人日常自动化作业系统 (Serverless Automated Daily Tasks)**
 
-面向个人生产力构建的无服务器（Serverless）日常自动化任务调度平台，涵盖 **AI 学术特工 (Resident Paper Agent)**、**全球宏观与金融简报**、**全球资讯内参**、**云服务状态维护** 与 **构建镜像同步**。
-
-[![CI Architecture](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=github-actions&logoColor=white)](https://github.com/crimson-and-clover/daily-actions/actions)
-[![Environment](https://img.shields.io/badge/Runtime-Python%203.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Package Manager](https://img.shields.io/badge/Manager-uv%20(Astral)-DE5FE9?logo=astral&logoColor=white)](https://docs.astral.sh/uv/)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=github-actions&logoColor=white)](https://github.com/crimson-and-clover/daily-actions/actions)
+[![Runtime](https://img.shields.io/badge/Runtime-Python%203.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Manager](https://img.shields.io/badge/Package-uv-DE5FE9?logo=astral&logoColor=white)](https://docs.astral.sh/uv/)
+[![Linter & Formatter](https://img.shields.io/badge/Linter%20%26%20Formatter-Ruff-black?logo=ruff&logoColor=white)](https://docs.astral.sh/ruff/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#)
 
 [![Paper Agent](https://github.com/crimson-and-clover/daily-actions/actions/workflows/paper-agent.yml/badge.svg)](https://github.com/crimson-and-clover/daily-actions/actions/workflows/paper-agent.yml)
-[![Market & FX](https://github.com/crimson-and-clover/daily-actions/actions/workflows/market-fx.yml/badge.svg)](https://github.com/crimson-and-clover/daily-actions/actions/workflows/market-fx.yml)
+[![Inbox Agent](https://github.com/crimson-and-clover/daily-actions/actions/workflows/inbox-agent.yml/badge.svg)](https://github.com/crimson-and-clover/daily-actions/actions/workflows/inbox-agent.yml)
+[![Inbox History Agent](https://github.com/crimson-and-clover/daily-actions/actions/workflows/inbox-history-agent.yml/badge.svg)](https://github.com/crimson-and-clover/daily-actions/actions/workflows/inbox-history-agent.yml)
+[![Market FX](https://github.com/crimson-and-clover/daily-actions/actions/workflows/market-fx.yml/badge.svg)](https://github.com/crimson-and-clover/daily-actions/actions/workflows/market-fx.yml)
 [![World News](https://github.com/crimson-and-clover/daily-actions/actions/workflows/world-news.yml/badge.svg)](https://github.com/crimson-and-clover/daily-actions/actions/workflows/world-news.yml)
 [![Glados Checkin](https://github.com/crimson-and-clover/daily-actions/actions/workflows/glados-checkin.yml/badge.svg)](https://github.com/crimson-and-clover/daily-actions/actions/workflows/glados-checkin.yml)
-[![FFmpeg Mirror](https://github.com/crimson-and-clover/daily-actions/actions/workflows/ffmpeg-mirror.yml/badge.svg)](https://github.com/crimson-and-clover/daily-actions/actions/workflows/ffmpeg-mirror.yml)
+[![FFmpeg Sync](https://github.com/crimson-and-clover/daily-actions/actions/workflows/ffmpeg-mirror.yml/badge.svg)](https://github.com/crimson-and-clover/daily-actions/actions/workflows/ffmpeg-mirror.yml)
 
 </div>
 
 ---
 
-## 📖 项目愿景与架构特性
+## ⚡ 任务调度与功能矩阵
 
-本项目旨在构建一个高稳定性、免维护、低延迟的云端自动化中枢：
+> 调度基准时区：**北京时间 (CST / UTC+8)**。点击对应组件名可查看该模块详细设计与配置。
 
-- **统一单 Python 运行时**：全仓依托现代包管理器 **[uv](https://docs.astral.sh/uv/)** 与 `pyproject.toml`，以 `uv.lock` 确定性锁定依赖，实现 0.5s 级依赖极速安装与缓存复用。
-- **结构化工程规范**：严格遵循 `src/` 源码分层规范，模块职能边界清晰，解耦公共通信组件与专用任务逻辑。
-- **现代化 CI/CD 编排**：采用官方最新 `astral-sh/setup-uv@v5` + `actions/checkout@v7`，保障最小安全攻击面与长期兼容性。
-- **状态持久化与内容分发**：
-  - **Memory Persistence**：通过独立的 `agent-state` 孤儿分支持久化存储 Agent 演进记忆与学术去重状态。
-  - **Static Site Delivery**：自动生成静态化报告归档，通过 `gh-pages` 部署至 GitHub Pages 门户。
+| 模块组件 | 调度周期 | 核心职能与业务价值 | 交付通道 | 详细配置 |
+| :--- | :--- | :--- | :--- | :---: |
+| **📬 Inbox Agent** | 每日 08:10 / 13:10 / 20:10<br>`10 0,5,12 * * * UTC` | **日常收件箱智能整理**：四维分类分流，日程待办提炼，自动归档 `商业推广`/`系统通知`，绝不物理硬删 | Gmail 卡片 | [README](src/inbox_agent/README.md) |
+| **📦 Inbox History** | 每日 03:25 (避峰)<br>`25 19 * * * UTC` | **90天历史积压整理**：从最旧到较新按 10 封小批次研判，过期废件移入回收站，历史凭证与推广分类归档 | Gmail 报告 | [README](src/inbox_agent/README.md) |
+| **🤖 Paper Agent** | 工作日 08:35<br>`35 0 * * 1-5 UTC` | **AI 论文追踪**：追踪 8 大前沿赛道，大模型初筛与全文精读，提取方法架构图并探测官方存活开源代码 | Gmail / Pages | [README](src/paper_agent/README.md) |
+| **📊 Market FX** | 周二至周六 06:15<br>`15 22 * * 1-5 UTC` | **宏观资产与外汇早报**：主流外汇追踪、澳元真分位数、越南盾三角套算、美股科技大盘与大宗指标 | Gmail / Pages | [README](src/market_fx/README.md) |
+| **🌐 World News** | 每日 07:35<br>`35 23 * * * UTC` | **全球资讯与开源动态**：聚合 CNBC / WSJ / BBC / HN / GitHub，LLM Impact Score (>=7.0) 降噪过滤 | Gmail / Pages | [README](src/world_news/README.md) |
+| **🛡️ Glados Checkin**| 每日 08:20<br>`20 0 * * * UTC` | **服务状态维护**：自动签到与权益兑换，维持开发节点和代理账号活跃 | CI 日志 | [README](src/glados_checkin/README.md) |
+| **🚀 FFmpeg Sync** | 每周日 10:15<br>`15 2 * * 0 UTC` | **镜像自动同步**：轮询上游 gyan.dev 最新构建版本，打包发布至 GitHub Release | GitHub Release | [README](src/ffmpeg_mirror/README.md) |
 
 ---
 
-## 📋 任务调度与功能矩阵
+## 🛠️ 工程化与设计哲学
 
-> 调度基准时区：**北京时间 (CST / UTC+8)**
+- **统一面向对象路径 (`pathlib.Path`)**：全工程彻底杜绝裸 `str` 路径，保证 Windows/Linux 跨平台绝对鲁棒。
+- **配置自闭环与启动预校验 (`validate_config`)**：各任务独立维护自身 `config.py`，入口统一快速失败（Fail-Fast），绝不中途静默崩溃。
+- **邮件服务纯函数解耦 (`utils.mailer`)**：基于 `redmail` 现代化邮件引擎与 `tenacity` 指数退避，发送方法接受显式凭证入参。
+- **极速代码质量流水线 (`Ruff`)**：基于 Ruff 统一管理 Lint 与 Format，严格保障 0 Warning / 0 Error 代码规范。
 
-| 模块组件 | 调度周期 | 核心机制与业务价值 | 交付通道 |
-| :--- | :--- | :--- | :--- |
-| **🤖 Resident Paper Agent**<br>`src/paper-agent/` | 工作日 **08:30**<br>`30 0 * * 1-5 (UTC)` | **前沿 AI 学术研究 Agent**：<br>• **领域聚焦**：自动驾驶 (AD)、世界模型 (World Models)、具身感知 (VLA)、广义动作模型 (WAM) 等前沿方向；<br>• **感知与全篇研读**：自动化获取 arXiv 原生 HTML 源码，深度拆解核心机制与公式；<br>• **DeepSeek 双轮研判**：提炼白话 TL;DR、落地价值与面试切入点；<br>• **持久记忆库**：双向同步 `agent-state` 分支，彻底避免重复推演。 | • Gmail 邮件<br>• Pages 网页端 |
-| **📊 Market & FX Brief**<br>`src/market-fx/` | 周二至周六 **06:00**<br>`0 22 * * 1-5 (UTC)` | **全球资产定价与旅行外汇风向标**：<br>• 追踪美股核心大盘 (S&P 500, Nasdaq, Dow Jones) 与科技巨头 (NVDA, TSLA, MSFT 等) 收盘表现；<br>• 宏观定锚：黄金价格、美元指数 (DXY)、美国 10 年期国债收益率；<br>• 智能外汇策略：澳元 (AUD/CNY)、越南盾 (CNY/VND) 走势追踪与换汇区间建议。 | • Gmail 邮件 |
-| **🌐 World News & Intelligence**<br>`src/world-news/` | 每日 **07:35**<br>`35 23 * * * (UTC)` | **宏观、资本市场与开源生态综合情报内参**：<br>• 多通道聚合：CNBC Markets、WSJ World、BBC World、Hacker News、GitHub Trending；<br>• 量化冲击评级：基于 LLM 对信息施行 Impact Score (>= 7.0/10) 严格降噪过滤；<br>• 跨市场逻辑传导：研判大宗商品、汇率与技术突破背后的产业纵深影响。 | • Gmail 邮件<br>• Pages 网页端 |
-| **🛡️ GLaDOS Checkin**<br>`src/glados-checkin/` | 每日 **08:00**<br>`0 0 * * * (UTC)` | **服务状态自动化维护**：<br>• 自动化执行 API 签到并兑换权益，保障开发节点与代理账号续期活跃。 | • Actions 日志 |
-| **🚀 FFmpeg Auto Sync**<br>`src/ffmpeg-mirror/` | 每周日 **10:00**<br>`0 2 * * 0 (UTC)` | **上游构建自动镜像与分发**：<br>• 轮询 gyan.dev 最新二进制版本；<br>• 自动比对差异，触发 Release 打包并上传 GitHub Release 资产。 | • GitHub Release |
+---
+
+## 🔑 凭据配置速查 (GitHub Secrets)
+
+仓库主页：`Settings` → `Secrets and variables` → `Actions` → `New repository secret`：
+
+| 变量名称 | 必需性 | 作用描述 | 关联组件 |
+| :--- | :---: | :--- | :--- |
+| `GMAIL_USER` | **必需** | Gmail 发信账号 | `inbox-agent`, `paper-agent`, `market-fx`, `world-news` |
+| `GMAIL_APP_PASS` | **必需** | Google 专用 16 位应用密码 (非登录密码) | `inbox-agent`, `paper-agent`, `market-fx`, `world-news` |
+| `NOTIFICATION_EMAIL`| 可选 | 接收通知的目标邮箱 (默认同 `GMAIL_USER`) | `inbox-agent`, `paper-agent`, `market-fx`, `world-news` |
+| `DEEPSEEK_API_KEY` | **必需** | 驱动学术精读、要闻降噪与收件箱分流的大模型密钥 | `inbox-agent`, `paper-agent`, `world-news` |
+| `INBOX_STATE_KEY` | **必需** | 收件箱记忆库 AES 对称加密密钥 (`python scripts/generate_inbox_key.py`) | `inbox-agent`, `inbox-history-agent` |
+| `COOKIES_GLADOS` | 可选 | GLaDOS 鉴权 Cookie (支持 Base64 或原始文本) | `glados-checkin` |
+
+> [!IMPORTANT]
+> **开启 Workflow 读写权限 (必需)**：  
+> Agent 需要向各自 `state/{ci-name}` 分支持久化加密记忆，研报需推送到 `gh-pages` 分支。  
+> 请在仓库 **Settings** → **Actions** → **General** → **Workflow permissions**，勾选 **Read and write permissions** 并保存。
 
 ---
 
@@ -52,95 +71,57 @@
 
 ```text
 daily-actions/
-├── .github/
-│   └── workflows/                # 声明式 GitHub Actions 编排配置
-│       ├── ffmpeg-mirror.yml     # FFmpeg 自动化构建发布工作流
-│       ├── glados-checkin.yml    # GLaDOS 状态续订工作流
-│       ├── market-fx.yml         # 宏观金融与汇率早报工作流
-│       ├── paper-agent.yml       # 学术研究特工工作流 (含记忆分支回写)
-│       └── world-news.yml        # 全球资讯与 Pages 静态站点部署工作流
-├── docs/                         # GitHub Pages 静态文档归档产物
-│   ├── index.html                # 门户主页导航
-│   ├── paper-agent/              # 论文报告站点目录
-│   └── world-news/               # 资讯报告站点目录
-├── src/                          # 任务源码根目录
-│   ├── ffmpeg-mirror/            # 镜像同步脚本集
-│   ├── glados-checkin/           # 自动签到核心实现
-│   ├── market-fx/                # 金融汇率指标抓取与模板渲染
-│   ├── paper-agent/              # 论文抓取、HTML 解析与 LLM 多轮推理
-│   ├── utils/                    # 跨任务公共基础设施 (SMTP 邮件传输引擎)
-│   └── world-news/               # 多源资讯聚合器与报告生成器
-├── .env                          # 本地环境变量配置（本地开发，已被 Git 忽略）
-├── .gitignore                    # 忽略规则清单
-├── .python-version               # 运行环境 Python 3.12 基准版本
-├── pyproject.toml                # 项目元数据与全局统一依赖规范
-├── uv.lock                       # 依赖确定性锁文件
-├── template_portal.html          # Pages 门户主页渲染模板
-└── README.md                     # 项目主文档
+├── .github/workflows/       # 声明式 GitHub Actions 编排配置
+├── docs/                    # GitHub Pages 静态门户与研报历史归档
+├── scripts/                 # 运维工具 (如 generate_inbox_key.py)
+├── src/                     # 标准 Python 模块源码根目录 (各组件均含独立 README)
+│   ├── inbox_agent/         # 📬 收件箱智能分流、DDL提炼与 90 天历史沉淀归档
+│   ├── paper_agent/         # 🤖 前沿 AI 学术研究追踪与两阶段研判
+│   ├── market_fx/           # 📊 宏观金融、外汇矩阵与美股指标
+│   ├── world_news/          # 🌐 全球多源资讯聚合与量化研判
+│   ├── glados_checkin/      # 🛡️ GLaDOS 自动签到保活
+│   ├── ffmpeg_mirror/       # 🚀 FFmpeg 上游构建镜像同步
+│   └── utils/               # 公共组件 (邮件分发引擎、页面生成器、Prompt 渲染器与时区工具)
+├── pyproject.toml           # 项目元数据与依赖定义 (基于 uv 与 hatchling)
+└── uv.lock                  # 依赖确定性锁文件
 ```
 
 ---
 
-## 🚀 快速上手与配置指引
+## 💻 本地极速调试
 
-### 1. 仓库凭据配置 (GitHub Secrets)
+项目依托现代 Python 包管理工具 **[uv](https://docs.astral.sh/uv/)** 与代码检查工具 **[Ruff](https://docs.astral.sh/ruff/)**：
 
-进入 GitHub 仓库页面：`Settings` → `Secrets and variables` → `Actions` → `New repository secret`，按需添加以下环境变量：
-
-| 变量名称 | 必需性 | 作用描述 | 示例 / 说明 |
-| :--- | :---: | :--- | :--- |
-| `GMAIL_USER` | **必需** | Gmail 发信主账号 | `example@gmail.com` |
-| `GMAIL_APP_PASS` | **必需** | Google 账号专用应用密码 | 16 位安全应用密码 (非登录密码) |
-| `NOTIFICATION_EMAIL` | 可选 | 接收通知的目标邮箱 | 留空时默认发送至 `GMAIL_USER` |
-| `DEEPSEEK_API_KEY` | **必需*** | 用于论文深度精读与要闻研判的大模型密钥 | `sk-xxxxxxxxxxxxxxxxxxxxxxxx` |
-| `COOKIES_GLADOS` | 可选 | GLaDOS 鉴权 Cookie (Base64) | 仅 GLaDOS 签到任务需要 |
-
-> [!IMPORTANT]
-> **开启 Workflow 读写权限 (必要)**：  
-> `paper-agent` 需要自动更新状态至 `agent-state` 分支，`world-news` 需要发布至 `gh-pages` 分支。  
-> 请务必在仓库进入：**Settings** → **Actions** → **General** → 找到 **Workflow permissions**，勾选 **Read and write permissions** 并保存。
-
-### 2. 本地开发与调试环境搭建
-
-项目采用现代 Python 包管理工具 `uv`，无需繁琐的虚拟环境配置。
-
-#### 安装 uv
 ```bash
-# Windows (PowerShell)
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# Linux / macOS
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-#### 本地同步与运行
-```bash
-# 1. 克隆代码仓库
+# 1. 克隆代码并安装依赖
 git clone git@github.com:crimson-and-clover/daily-actions.git
-cd daily-actions
+cd daily-actions && uv sync
 
-# 2. 一键同步并安装全部依赖
-uv sync
+# 2. 配置本地 .env (仓库提供标准模板)
+cp .env.example .env  # 填入凭据，本地无凭据时自动降级为保存 preview 文件
 
-# 3. 配置本地环境变量 (项目已提供 .env 模板)
-# 编辑根目录 .env 文件，填入对应的凭据
+# 3. 运行任意任务
+uv run python -m inbox_agent.agent
+uv run python -m inbox_agent.history_agent
+uv run python -m paper_agent.agent
+uv run python -m market_fx.report
+uv run python -m world_news.report
 
-# 4. 执行任意任务 (本地无邮件凭据时会自动降级保存为 preview_report.html)
-uv run python src/market-fx/report.py
-uv run python src/world-news/report.py
-uv run python src/paper-agent/agent.py
+# 4. 代码规范检查与格式化 (宽度 256)
+uv run ruff check src/ scripts/
+uv run ruff format src/ scripts/
 ```
 
 ---
 
-## 🔒 分支架构策略 (Branch Architecture)
+## 🔒 分支架构策略
 
-- **`master`**：主开发分支，维护所有任务源码、Workflow 定义与静态网页模板。
-- **`agent-state`**：状态孤儿分支，用于解耦 `paper-agent` 的历史运行状态 (`history.json`)，避免高频日志污染主分支提交记录。
-- **`gh-pages`**：文档托管分支，由 `actions-gh-pages` 自动生成，专供 GitHub Pages 静态站点部署与访问。
+- **`master`**：主开发分支，维护核心源码、工作流定义与依赖锁文件。
+- **`state/{ci-name}`**：各任务专属的独立持久化状态分支（如 `state/inbox-agent`, `state/paper-agent`），彻底解耦并发冲突。
+- **`gh-pages`**：静态网站托管分支，由 CI 自动增量构建发布全站门户与历史研报归档。
 
 ---
 
 ## 📄 开源许可证
 
-本项目基于 [MIT License](LICENSE) 许可证发布。
+本项目基于 [MIT License](LICENSE) 许可证开源发布。

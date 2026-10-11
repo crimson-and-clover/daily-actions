@@ -1,51 +1,80 @@
-import os
-import sys
+"""
+通用 Gmail 邮件发送模块 (基于 redmail 现代化邮件引擎，集成 tenacity 网络重试)
+"""
+
 import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from dotenv import load_dotenv
+import sys
+from pathlib import Path
 
-# 自动加载根目录或当前工作目录的 .env 文件
-load_dotenv()
+from redmail import EmailSender
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
-def send_email_html(subject: str, html_content: str, preview_path: str = "preview.html") -> bool:
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=3, max=15),
+    reraise=True,
+)
+def _dispatch_email_with_retry(
+    email: EmailSender,
+    subject: str,
+    sender: str,
+    receivers: list[str],
+    html: str,
+) -> None:
+    """内部带指数退避重试的发信核心逻辑"""
+    email.send(
+        subject=subject,
+        sender=sender,
+        receivers=receivers,
+        html=html,
+    )
+
+
+def send_email_html(
+    subject: str,
+    html_content: str,
+    gmail_user: str,
+    gmail_pass: str,
+    receiver: str,
+    is_ci: bool = False,
+    preview_path: Path = Path("preview.html"),
+) -> bool:
     """
-    通用 Gmail 邮件发送工具。
-    若未检测到凭证，自动保存为本地 HTML 预览文件，避免报错退出。
+    基于 redmail 与 tenacity 重试的 Gmail HTML 邮件发送工具。
+    入参明确显式传入邮箱凭据与接收人（已在各 Agent 的 config.py 统一清洗与校验）。
+    若未检测到凭证（本地开发），自动保存为本地 HTML 预览文件。
     """
-    gmail_user = (os.getenv("GMAIL_USER") or "").strip()
-    gmail_pass = (os.getenv("GMAIL_APP_PASS") or "").replace(" ", "").strip()
-    receiver = (os.getenv("NOTIFICATION_EMAIL") or "").strip()
-    if not receiver:
-        receiver = gmail_user
-
     if not gmail_user or not gmail_pass:
-        print(f"⚠️ [提示] 未配置 GMAIL_USER 或 GMAIL_APP_PASS，将保存为本地预览文件: {preview_path}")
-        try:
-            os.makedirs(os.path.dirname(os.path.abspath(preview_path)), exist_ok=True)
-            with open(preview_path, "w", encoding="utf-8") as f:
-                f.write(html_content)
-            print(f"✅ 预览文件已保存至: {os.path.abspath(preview_path)}")
-        except Exception as e:
-            print(f"写入预览文件失败: {e}", file=sys.stderr)
+        if is_ci:
+            print("❌ [Fatal Error] CI 环境中必须配置 GMAIL_USER 与 GMAIL_APP_PASS，严禁跳过发信！", file=sys.stderr, flush=True)
+            sys.exit(1)
+        preview_file = preview_path.resolve()
+        print(f"⚠️ [提示] 本地未配置 GMAIL_USER 或 GMAIL_APP_PASS，将保存为本地预览文件: {preview_file}", flush=True)
+        preview_file.parent.mkdir(parents=True, exist_ok=True)
+        preview_file.write_text(html_content, encoding="utf-8")
+        print(f"✅ 预览文件已保存至: {preview_file}", flush=True)
         return False
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"Daily Actions <{gmail_user}>"
-    msg["To"] = receiver
-
-    part = MIMEText(html_content, "html", "utf-8")
-    msg.attach(part)
-
     try:
-        print(f"正在连接 smtp.gmail.com:465 发送邮件至 {receiver} ...")
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(gmail_user, gmail_pass)
-            server.sendmail(gmail_user, [receiver], msg.as_string())
-        print(f"✅ 邮件发送成功！主题: {subject}")
+        print(f"正在通过 redmail 连接 smtp.gmail.com:465 发送邮件至 {receiver} (tenacity 重试保护)...", flush=True)
+        email = EmailSender(
+            host="smtp.gmail.com",
+            port=465,
+            username=gmail_user,
+            password=gmail_pass,
+            cls_smtp=smtplib.SMTP_SSL,
+            use_starttls=False,
+        )
+        _dispatch_email_with_retry(
+            email=email,
+            subject=subject,
+            sender=f"Daily Actions <{gmail_user}>",
+            receivers=[receiver],
+            html=html_content,
+        )
+        print(f"✅ 邮件发送成功！主题: {subject}", flush=True)
         return True
     except Exception as e:
-        print(f"❌ 邮件发送失败: {e}", file=sys.stderr)
+        print(f"❌ 邮件发送在 3 次重试后仍失败: {e}", file=sys.stderr, flush=True)
         sys.exit(1)

@@ -1,0 +1,239 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Inbox Agent 收件箱简报</title>
+</head>
+<body style="margin: 0; padding: 16px 8px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; -webkit-font-smoothing: antialiased; line-height: 1.45;">
+
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed;">
+        <tr>
+            <td align="center">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 680px; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden;">
+
+                    <!-- 紧凑头部与状态摘要 -->
+                    <tr>
+                        <td style="padding: 16px 20px 12px 20px; border-bottom: 2px solid #0f172a; background-color: #ffffff;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="left">
+                                        <span style="font-size: 16px; font-weight: bold; color: #0f172a; letter-spacing: -0.01em;">
+                                            收件箱简报 [{{ run_slot }}]
+                                        </span>
+                                        <span style="font-size: 12px; color: #64748b; margin-left: 8px;">{{ date_str }}</span>
+                                    </td>
+                                    <td align="right" style="font-size: 12px; color: #475569; font-weight: 500;">
+                                        待办 <strong style="color: #dc2626;">{{ today_due_schedules|length }}</strong>
+                                        &bull; 新增 <strong style="color: #ea580c;">{{ schedules|length }}</strong>
+                                        &bull; 重要 <strong style="color: #2563eb;">{{ importants|length }}</strong>
+                                        &bull; 通知 <strong style="color: #475569;">{{ systems_moved_count }}</strong>
+                                        &bull; 营销 <strong style="color: #c2410c;">{{ marketings_moved_count }}</strong>
+                                        &bull; 垃圾 <strong style="color: #64748b;">{{ spams_moved_count }}</strong>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- 主内容区 -->
+                    <tr>
+                        <td style="padding: 16px 20px;">
+
+                            <!-- 1. 重点待办与日程预警 (P0: 红字高紧迫) -->
+                            {% if today_due_schedules %}
+                            <div style="margin-bottom: 20px;">
+                                <div style="font-size: 13px; font-weight: bold; color: #dc2626; border-bottom: 1px solid #fecaca; padding-bottom: 4px; margin-bottom: 10px;">
+                                    [重点待办与日程预警] ({{ today_due_schedules|length }})
+                                </div>
+                                {% for item in today_due_schedules %}
+                                <div style="border-left: 3px solid #dc2626; background-color: #fef2f2; padding: 10px 12px; margin-bottom: 8px;">
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                        <tr>
+                                            <td align="left" style="font-size: 13px; font-weight: bold; color: #991b1b;">
+                                                <span style="background-color: #fee2e2; color: #b91c1c; padding: 1px 5px; border-radius: 3px; font-size: 11px; margin-right: 4px;">{{ item.due_status }}</span>
+                                                {{ item.subject }}
+                                            </td>
+                                            <td align="right" style="font-size: 11px; color: #dc2626; font-weight: 600; white-space: nowrap;">
+                                                {{ item.event_time or item.event_date }}
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    <div style="font-size: 12px; color: #450a0a; margin-top: 4px;">
+                                        <strong>待办要点:</strong> {{ item.tldr }}
+                                    </div>
+                                    {% if item.action_items %}
+                                    <div style="margin-top: 6px; font-size: 12px; color: #7f1d1d; border-top: 1px dashed #fecaca; padding-top: 4px;">
+                                        <strong>材料/执行清单:</strong>
+                                        <ul style="margin: 2px 0 0 0; padding-left: 18px; line-height: 1.4;">
+                                            {% for act in item.action_items %}
+                                            <li>{{ act }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            <!-- 2. 本期新增日程与待办 (P1: 橙红) -->
+                            {% if schedules %}
+                            <div style="margin-bottom: 20px;">
+                                <div style="font-size: 13px; font-weight: bold; color: #ea580c; border-bottom: 1px solid #fed7aa; padding-bottom: 4px; margin-bottom: 10px;">
+                                    [本期新增待办与日程] ({{ schedules|length }})
+                                </div>
+                                {% for item in schedules %}
+                                <div style="border-left: 3px solid #ea580c; background-color: #fff7ed; padding: 10px 12px; margin-bottom: 8px;">
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                        <tr>
+                                            <td align="left" style="font-size: 13px; font-weight: bold; color: #9a3412;">
+                                                {{ item.subject }}
+                                            </td>
+                                            <td align="right" style="font-size: 11px; color: #c2410c; white-space: nowrap;">
+                                                {{ item.event_time or item.from }}
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    <div style="font-size: 12px; color: #431407; margin-top: 4px;">
+                                        <strong>事项概要:</strong> {{ item.tldr }}
+                                    </div>
+                                    {% if item.action_items %}
+                                    <div style="margin-top: 6px; font-size: 12px; color: #7c2d12; border-top: 1px dashed #fed7aa; padding-top: 4px;">
+                                        <ul style="margin: 2px 0 0 0; padding-left: 18px; line-height: 1.4;">
+                                            {% for act in item.action_items %}
+                                            <li>{{ act }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            <!-- 3. 工作重要联络 (P1/P2: 蓝字) -->
+                            <div style="margin-bottom: 20px;">
+                                <div style="font-size: 13px; font-weight: bold; color: #2563eb; border-bottom: 1px solid #bfdbfe; padding-bottom: 4px; margin-bottom: 10px;">
+                                    [重要工作与个人来信] ({{ importants|length }})
+                                </div>
+                                {% if importants %}
+                                    {% for item in importants %}
+                                    <div style="border-left: 3px solid #2563eb; background-color: #eff6ff; padding: 8px 12px; margin-bottom: 6px;">
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td align="left" style="font-size: 13px; font-weight: bold; color: #1e3a8a;">
+                                                    {{ item.subject }}
+                                                </td>
+                                                <td align="right" style="font-size: 11px; color: #64748b; white-space: nowrap;">
+                                                    {{ item.from }}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div style="font-size: 12px; color: #1e293b; margin-top: 3px;">
+                                            {{ item.tldr }}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div style="color: #94a3b8; font-size: 12px; font-style: italic;">暂无新增重要来信。</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- 4. 系统服务通知与资讯 (移入 系统通知 专用目录) -->
+                            <div style="margin-bottom: 20px;">
+                                <div style="font-size: 13px; font-weight: bold; color: #475569; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 8px;">
+                                    [系统服务通知与资讯 &bull; 专属目录归档] ({{ systems|length }})
+                                </div>
+                                {% if systems %}
+                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 12px; border-collapse: collapse;">
+                                    {% for item in systems %}
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 6px 0; color: #0f172a; font-weight: 500;">
+                                            {{ item.subject }}
+                                            {% if item.tldr and item.tldr != item.subject %}
+                                            <span style="color: #64748b; font-weight: normal; margin-left: 6px;">- {{ item.tldr }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td style="padding: 6px 8px; color: #64748b; white-space: nowrap; text-align: right; font-size: 11px;">
+                                            {{ item.from }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                                {% else %}
+                                    <div style="color: #94a3b8; font-size: 12px; font-style: italic;">暂无系统通知。</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- 5. 商业营销推广隔离 (移入 商业推广 专用目录) -->
+                            {% if marketings %}
+                            <div style="margin-bottom: 20px;">
+                                <div style="font-size: 13px; font-weight: bold; color: #c2410c; border-bottom: 1px solid #fed7aa; padding-bottom: 4px; margin-bottom: 6px;">
+                                    [商业营销推广隔离] ({{ marketings|length }})
+                                </div>
+
+                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 12px; border-collapse: collapse;">
+                                    {% for item in marketings %}
+                                    <tr style="border-bottom: 1px solid #ffedd5;">
+                                        <td style="padding: 5px 0; color: #334155; font-weight: 500;">
+                                            {{ item.from }}
+                                            <span style="color: #94a3b8; font-size: 11px; margin-left: 6px; font-weight: normal;">({{ item.subject }})</span>
+                                        </td>
+                                        <td style="padding: 5px 0; text-align: right; white-space: nowrap;">
+                                            {% if item.unsubscribe_link %}
+                                            <a href="{{ item.unsubscribe_link }}" target="_blank" style="color: #c2410c; text-decoration: underline; font-weight: 600; font-size: 12px;">
+                                                [退订]
+                                            </a>
+                                            {% else %}
+                                            <span style="color: #cbd5e1; font-size: 11px;">[无退订链接]</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                            </div>
+                            {% endif %}
+
+                            <!-- 6. 恶意垃圾与欺诈拦截 (移入 [Gmail]/Spam 官方垃圾箱) -->
+                            <div>
+                                <div style="font-size: 13px; font-weight: bold; color: #64748b; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 6px;">
+                                    [恶意垃圾与欺诈拦截] ({{ spams|length }})
+                                </div>
+
+                                {% if spams %}
+                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 12px; border-collapse: collapse;">
+                                    {% for item in spams %}
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 5px 0; color: #475569;">
+                                            {{ item.subject }}
+                                            <span style="color: #94a3b8; font-size: 11px; margin-left: 6px;">来自: {{ item.from }}</span>
+                                        </td>
+                                        <td style="padding: 5px 0; text-align: right; color: #dc2626; font-size: 11px; white-space: nowrap;">
+                                            {{ item.reason or "恶意垃圾特征" }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                                {% else %}
+                                <div style="color: #94a3b8; font-size: 11px; font-style: italic; padding: 2px 0;">未检出恶意钓鱼或欺诈邮件。</div>
+                                {% endif %}
+                            </div>
+
+                        </td>
+                    </tr>
+
+                    <!-- 紧凑页脚 -->
+                    <tr>
+                        <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 10px 20px; text-align: center; font-size: 11px; color: #94a3b8;">
+                            Inbox Agent &bull; 08:00 / 13:00 / 20:00 (BJT)
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

@@ -1,0 +1,63 @@
+name: Inbox Agent
+
+on:
+  schedule:
+    # 早上 (08:10 BJT -> 00:10 UTC)
+    # 中午 (13:10 BJT -> 05:10 UTC)
+    # 晚上 (20:10 BJT -> 12:10 UTC)
+    - cron: '10 0,5,12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-inbox-agent:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Code (master)
+        uses: actions/checkout@v7
+
+      - name: Checkout Agent State (state/inbox-agent branch)
+        uses: actions/checkout@v7
+        with:
+          ref: state/inbox-agent
+          path: state
+          fetch-depth: 0
+        continue-on-error: true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Run Inbox Agent
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASS: ${{ secrets.GMAIL_APP_PASS }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          INBOX_STATE_KEY: ${{ secrets.INBOX_STATE_KEY }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          uv run python -m inbox_agent.agent
+
+      - name: Commit and push memory updates to state branch
+        if: always() && hashFiles('state/.git/config') != ''
+        working-directory: state
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          mkdir -p inbox-agent
+          git rm -f inbox-agent/history.json 2>/dev/null || true
+          if [ -f inbox-agent/history.enc ]; then
+            git add inbox-agent/history.enc
+            if ! git diff --staged --quiet; then
+              git commit -m "chore(inbox-agent): update encrypted memory state [skip ci]"
+              git push origin state/inbox-agent
+            fi
+          fi
