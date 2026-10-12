@@ -58,6 +58,7 @@ def classify_email(email_item: dict, api_key: str, my_email: str = "") -> dict:
             "event_time": "",
             "event_date": "",
             "reason": "系统内建CI报告白名单",
+            "is_internal_ci": is_internal_ci or ("daily actions" in from_addr_lower),
         }
 
     client = OpenAI(

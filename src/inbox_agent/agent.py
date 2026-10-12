@@ -142,7 +142,9 @@ def main():
                 memory.mark_processed(m_id, is_spam=True)
             elif cat == "newsletter_system":
                 # 纯系统服务通知/订阅资讯：归档至系统通知目录
-                systems.append(merged)
+                # 若为当前项目自发 CI 任务邮件，直接在简报展示层过滤掉，不冗余呈现
+                if not merged.get("is_internal_ci"):
+                    systems.append(merged)
                 if uid:
                     batch_systems_uids.append(uid)
                 memory.mark_processed(m_id, is_spam=False)
