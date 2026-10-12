@@ -85,9 +85,11 @@ SCORE_THRESHOLD = 7.0
 
 # 宏观与财经数据源配置
 MACRO_SOURCES = [
-    {"name": "CNBC Markets", "url": "https://www.cnbc.com/id/10000664/device/rss/rss.html", "limit": 12},
-    {"name": "BBC World", "url": "https://feeds.bbci.co.uk/news/world/rss.xml", "limit": 12},
-    {"name": "WSJ World", "url": "https://feeds.a.dj.com/rss/RSSWorldNews.xml", "limit": 10},
+    {"name": "WSJ World", "url": "https://feeds.content.dowjones.io/public/rss/RSSWorldNews", "limit": 10},
+    {"name": "WSJ Markets", "url": "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain", "limit": 10},
+    {"name": "Bloomberg Markets", "url": "https://feeds.bloomberg.com/markets/news.rss", "limit": 10},
+    {"name": "CNBC Markets", "url": "https://www.cnbc.com/id/10000664/device/rss/rss.html", "limit": 10},
+    {"name": "BBC World", "url": "https://feeds.bbci.co.uk/news/world/rss.xml", "limit": 10},
 ]
 
 # 科技与开源数据源配置
