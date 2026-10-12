@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全球宏观、市场与计算开源内参</title>
+    <style>
+        /* 移动端与桌面端自适应、彻底告别挤压折叠 */
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f1f3f5;
+            margin: 0;
+            padding: 12px 6px;
+            color: #1a202c;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #d2d6dc;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        /* 刊头：流式上下堆叠，绝不左右横向硬挤 */
+        .masthead {
+            padding: 20px 18px 14px 18px;
+            border-bottom: 2px solid #0f172a;
+            background: #ffffff;
+        }
+        .masthead-meta-top {
+            font-size: 11px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .masthead h1 {
+            margin: 4px 0 6px 0;
+            font-size: 21px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            line-height: 1.3;
+        }
+        .masthead-date {
+            font-size: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .masthead-sub {
+            margin: 0;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        /* 态势关键信号横条：采用竖向流式清单，杜绝横向窄列挤压 */
+        .signals-box {
+            padding: 12px 18px;
+            background-color: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .signals-title {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .signals-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .signals-list li {
+            position: relative;
+            padding-left: 14px;
+            font-size: 12.5px;
+            color: #334155;
+            line-height: 1.5;
+            margin-bottom: 6px;
+        }
+        .signals-list li:last-child {
+            margin-bottom: 0;
+        }
+        .signals-list li::before {
+            content: "▪";
+            position: absolute;
+            left: 0;
+            color: #2563eb;
+            font-size: 13px;
+        }
+
+        .content {
+            padding: 18px 16px;
+        }
+
+        /* 宏观态势综述 */
+        .summary-block {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #0f172a;
+            padding: 14px 16px;
+            margin-bottom: 24px;
+            border-radius: 0 4px 4px 0;
+        }
+        .summary-label {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+        .summary-body {
+            font-size: 13.5px;
+            color: #1e293b;
+            line-height: 1.65;
+            text-align: justify;
+        }
+
+        /* 板块分割栏 */
+        .section {
+            margin-bottom: 26px;
+        }
+        .section-header {
+            border-bottom: 1.5px solid #0f172a;
+            padding-bottom: 6px;
+            margin-bottom: 14px;
+        }
+        .section-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            display: inline-block;
+        }
+        .section-code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+            display: inline-block;
+            margin-left: 6px;
+        }
+
+        /* 条目卡片 */
+        .item-card {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            padding: 14px 14px 12px 14px;
+            margin-bottom: 16px;
+            border-radius: 4px;
+        }
+
+        /* 卡片头部：分层解耦，不再横向打架 */
+        .item-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .badge-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .item-tag {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #1d4ed8;
+            background-color: #eff6ff;
+            border: 1px solid #dbeafe;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .source-tag {
+            font-size: 10.5px;
+            color: #475569;
+            background-color: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        .score-pill-overall {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 2px;
+            background-color: #0f172a;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        /* 细分多维指标条：单起一行，清晰明了 */
+        .sub-metrics-row {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 10.5px;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed #f1f5f9;
+        }
+        .sub-metrics-row span {
+            color: #1e293b;
+        }
+
+        .item-title {
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.45;
+            color: #0f172a;
+            margin: 0 0 10px 0;
+        }
+        .item-title a {
+            color: #0f172a;
+            text-decoration: none;
+        }
+        .item-title a:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+
+        /* 段落式正文：流式撑满全宽，彻底消除 86px 逼仄分栏 */
+        .data-content {
+            font-size: 13px;
+            color: #1f2937;
+            line-height: 1.6;
+        }
+        .data-para {
+            margin-bottom: 8px;
+            text-align: justify;
+        }
+        .data-para:last-child {
+            margin-bottom: 0;
+        }
+        .para-label {
+            font-weight: 700;
+            color: #475569;
+            font-size: 12px;
+            display: inline;
+            margin-right: 4px;
+        }
+        .para-rationale {
+            font-size: 12px;
+            color: #64748b;
+            font-style: italic;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* 市场资产传导专属研判框：自适应流式排版 */
+        .market-box {
+            margin-top: 10px;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 3px solid #2563eb;
+            padding: 9px 12px;
+            font-size: 12.5px;
+            border-radius: 0 3px 3px 0;
+        }
+        .market-header {
+            font-weight: 700;
+            color: #1e40af;
+            font-size: 11px;
+            margin-bottom: 4px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .assets-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            padding: 1px 5px;
+            border-radius: 2px;
+            font-size: 11px;
+            margin-left: 4px;
+            font-weight: 600;
+        }
+        .market-logic {
+            color: #0f172a;
+            line-height: 1.55;
+            text-align: justify;
+            margin-top: 4px;
+        }
+
+        /* 元信息脚标栏 */
+        .item-footer {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px dashed #e2e8f0;
+            font-size: 11px;
+            color: #94a3b8;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .item-footer a {
+            color: #64748b;
+            text-decoration: none;
+        }
+        .item-footer a:hover {
+            text-decoration: underline;
+        }
+        .stat-badge {
+            color: #334155;
+            font-weight: 600;
+        }
+
+        /* 脚注 */
+        .footer {
+            padding: 16px 18px;
+            font-size: 11px;
+            color: #64748b;
+            background: #fafafa;
+            border-top: 1px solid #e5e7eb;
+            line-height: 1.55;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="padding: 12px 18px 0 18px; font-size: 12px; color: #64748b; background: #ffffff;">
+            <a href="../index.html" style="color: #2563eb; text-decoration: none; font-weight: 500;">&larr; 返回资讯专区目录</a>
+            <span style="margin: 0 8px; color: #cbd5e1;">|</span>
+            <a href="../../index.html" style="color: #64748b; text-decoration: none;">知识门户总览</a>
+        </div>
+        <!-- 刊头 -->
+        <div class="masthead">
+            <div class="masthead-meta-top">GLOBAL INTELLIGENCE & TECHNOLOGY BRIEFING</div>
+            <h1>全球宏观、市场与计算开源内参</h1>
+            <div class="masthead-date">2026年10月12日 (北京时间)</div>
+            <p class="masthead-sub">
+                多源聚合 • 多维度量化评级 (Overall &ge; 7.0) • 资本市场与产业传导研判
+            </p>
+        </div>
+
+        <!-- 态势关键信号栏：纵向流式清单，彻底解决横向挤压 -->
+        <div class="signals-box">
+            <div class="signals-title">KEY SIGNALS / 核心态势信号</div>
+            <ul class="signals-list">
+                <li>能源停火若落地将压缩地缘风险溢价，油气与欧洲天然气波动率回落，但俄方沉默意味着协议脆弱、易反复。</li>
+                <li>万科巨亏确认中国地产信用风险由民企向混合所有制龙头扩散，需紧盯国有股东注资力度与黑色系大宗需求拖累。</li>
+                <li>美联储纪要未给加息时点，利率路径数据依赖强化，10年期美债收益率与美元指数对就业与通胀数据敏感度上升。</li>
+                <li>Strata、laya、jev-ultrafast等开源项目将推理与智能体成本压向边际，云厂商API定价权与GPU租赁溢价面临中期侵蚀。</li>
+            </ul>
+        </div>
+
+        <div class="content">
+
+            <!-- 宏观态势综述 -->
+            <div class="summary-block">
+                <div class="summary-label">EXECUTIVE SUMMARY / 宏观态势与市场综述</div>
+                <div class="summary-body">俄乌能源停火博弈、中国房企信用风险外溢、美联储加息观望三线交织，叠加海底光缆疑遭破坏触发北约首次协同响应，全球风险偏好转向防御；同时消费级本地推理与低成本Web智能体开源突破加速算力权力下移，宏观不确定性与技术降本形成对冲。</div>
+            </div>
+
+            <!-- 第一板块：宏观地缘与金融资本市场 -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">宏观地缘与全球金融市场</span>
+                    <span class="section-code">[SEC-01 / MACRO & FINANCIAL]</span>
+                </div>
+
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">地缘安全 / 大宗能源</span>
+                                <span class="source-tag">BBC World</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.6 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>9.0</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>8.0</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.5</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.bbc.co.uk/news/articles/c6pvg4jyz1m0o?at_medium=RSS&amp;at_campaign=rss" target="_blank">特朗普宣称俄乌达成“能源停火”，泽连斯基表态有条件支持 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：俄乌能源停火牵动油气定价与欧洲地缘格局，战略溢价极高</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>美方提出俄乌暂停相互打击能源基础设施的“能源停火”安排，乌方无人机此前多次袭击俄境内炼厂与油气管网，公开估算一度令俄约一成炼能停摆；泽连斯基表示若莫斯科同步执行则乌方支持，俄方迄今未作正式回应，亦无第三方核查机制与生效时间表。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>美国希望以停火换取油价与通胀降温并保留调停主导权；乌克兰以对等履约为前提，避免单方面失去远程打击筹码；俄罗斯保持沉默以维持谈判模糊性与战场压力；欧洲炼厂与航运业关注取暖季柴油与天然气供应安全；交易商则押注协议可执行性偏低。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>若停火兑现，俄炼能修复将增加成品油出口，全球柴油与原油供应边际宽松，欧洲能源安全溢价回落；若破裂，乌方继续打击炼厂将放大俄成品油出口缺口，推升全球裂解价差并强化对俄制裁博弈的金融化与阵营化，加速亚洲买家与俄油贸易通道重构。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">Brent/WTI原油期货、欧洲柴油裂解价差、TTF天然气期货、俄罗斯卢布、欧洲炼化与航运股</span>
+                            </div>
+                            <div class="market-logic">停火预期先行压制原油与柴油的地缘风险溢价，裂解价差与近月合约承压，能源股估值由供给冲击逻辑切换回需求与库存逻辑；若俄方持续沉默导致协议证伪，风险溢价迅速回补并放大波动率，基金空头回补将推动曲线由Backwardation进一步陡化，通胀预期与欧央行降息路径亦随之重定价。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Trump&#39;s &#39;energy ceasefire&#39; claim welcomed by Zelen...</span>
+                            <span>Sun, 11 Oct 2026 21:36:40 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">房地产 / 信用风险</span>
+                                <span class="source-tag">WSJ World</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.4 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>8.2</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>8.3</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.6</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/articles/even-chinas-property-stalwart-isnt-immune-from-the-crisis-19799863" target="_blank">万科披露巨额亏损，中国房地产危机呈扩大蔓延之势 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：龙头房企巨亏标志中国地产风险外溢，冲击信用与大宗需求</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>万科公布上市以来首次年度巨额亏损，规模约数百亿元人民币，销售额与毛利率同步下滑；其第一大股东深圳地铁为地方国资平台，市场关注其是否追加注资或提供债务展期支持；同期新房销售、二手房挂牌价与房企境内外债券价格继续走弱，行业出险主体由民营房企向混合所有制龙头扩散。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>深圳国资面临保交楼、稳定区域金融与自身资产负债表的三重约束；境内银行与保险债权人不愿率先减记，倾向展期续贷；境外美元债持有人要求足额偿付并施压重组条款；购房者与地方政府最关注交付与土地财政；中央层面则在“止跌回稳”与不搞大规模刺激之间权衡。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>地产链占中国GDP与地方财政比重高，龙头出险将进一步压缩土地出让收入、抑制建材与家电需求，并通过银行抵押品价值与居民财富效应拖累内需，倒逼政策在需求端放松、收储与白名单融资上继续加码，也影响外资对中国主权与准主权信用定价。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">中国房企美元债与境内地产债、铁矿石与螺纹钢期货、恒生内房股指数、人民币汇率、银行与保险板块</span>
+                            </div>
+                            <div class="market-logic">亏损与流动性担忧推升房企信用利差，垃圾级美元债价格承压、收益率跳升，并传导至银行资产质量预期压低金融股估值；地产投资收缩压制铁矿石与黑色系商品需求，价格中枢下移；同时避险情绪与政策宽松预期对人民币形成双向拉扯，若国资注资落地则风险资产出现估值修复式反弹。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Leading China Property Developer Reports Huge loss...</span>
+                            <span>Mon, 27 Jan 2025 12:32:00 -0500</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">货币政策</span>
+                                <span class="source-tag">CNBC Markets</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.2 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>8.0</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>9.0</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>7.6</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.cnbc.com/2026/10/07/fed-officials-see-another-hike-coming-but-no-sign-as-to-when-minutes-show.html" target="_blank">美联储会议纪要：官员预计仍将加息但时点未明 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：美联储纪要暗示继续加息，直接驱动美债收益率与美元定价</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>美联储公布9月议息会议纪要，显示多数官员认为在通胀确认回落到2%目标之前需维持限制性利率，部分官员倾向年内进一步加息，但一致强调后续路径取决于数据，未给出明确时点；纪要同时讨论就业市场降温速度与金融条件收紧对需求的替代作用，缩表进程按既定节奏推进。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>鹰派官员强调通胀黏性与预期脱锚风险，主张保留加息选项；鸽派官员担忧过度紧缩引发失业率跳升，倾向长时间按兵不动；白宫关注融资成本对住房与企业投资的政治影响；债券投资者与一级交易商则通过掉期市场定价更长期的高利率平台；新兴市场央行被动跟随以稳定汇率。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>纪要确认“更高更久”的利率范式，抬升全球无风险利率中枢，压缩风险资产估值与新兴市场外部融资空间，并通过强势美元加剧以美元计价债务国的偿付压力，同时为美国财政赤字货币化争论与下任联储人事博弈埋下伏笔。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">10年期与2年期美债收益率、美元指数、标普500与纳斯达克、黄金、新兴市场货币与债券</span>
+                            </div>
+                            <div class="market-logic">纪要偏鹰推高实际利率与期限溢价，10年期美债收益率上行直接压低成长股远期现金流折现值，纳指与高估值科技板块承压；美元指数因利差优势走强，压制黄金与新兴市场货币；若后续就业与CPI低于预期，市场将迅速定价加息周期终结，收益率曲线陡峭化交易与风险资产反弹同步出现。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Fed officials see another hike coming, but no sign...</span>
+                            <span>Wed, 07 Oct 2026 18:42:36 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">大宗能源</span>
+                                <span class="source-tag">CNBC Markets</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.1 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>7.8</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>8.2</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.2</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.cnbc.com/2026/10/06/diesel-oil-refinery-price-capacity-demand.html" target="_blank">高盛：炼能紧张或令柴油价格高企至2027年 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：柴油高位延续至2027年，指向炼能瓶颈与中长期通胀传导</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>高盛研究报告指出，全球炼油产能增长滞后于需求，柴油与中间馏分油供给持续偏紧，需维持高裂解价差以抑制需求并重建库存，预计柴油价格强势将延续至2027年；炼厂关停、检修延后、环保与资本开支约束以及俄炼能受损共同构成供给端刚性。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>炼化企业乐于维持高利润率但面临新建产能的碳约束与审批阻力；航运、卡车运输与农业等柴油终端用户承受成本压力并可能向终端价格转移；产油国关注中质含硫原油需求；消费国政府担忧柴油涨价推升运输与食品通胀，可能动用战略储备或放宽环保规格。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>柴油是工业与物流的血液，其价格中枢长期上移意味着运输与农业成本刚性抬升，向核心通胀传导并延长央行紧缩周期；同时高裂解价差刺激炼能投资与老旧炼厂延寿，重塑全球炼化版图，并强化对俄成品油制裁与贸易流向重构的战略意义。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">柴油与取暖油期货、原油裂解价差、能源板块ETF、航运与航空股、通胀挂钩债券</span>
+                            </div>
+                            <div class="market-logic">供给瓶颈预期支撑柴油近月合约与裂解价差走强，炼化企业盈利上修带动能源股相对收益；高运费与燃料成本压制航空、航运与物流企业利润率，并经由运输成本推升CPI，令通胀互换与盈亏平衡通胀率上行，进而对长端美债收益率形成向上压力，压制利率敏感型资产。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Goldman: Diesel prices set to stay high through 20...</span>
+                            <span>Tue, 06 Oct 2026 08:47:30 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">地缘安全 / 关键基础设施</span>
+                                <span class="source-tag">WSJ World</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.1 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>9.1</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>6.8</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.4</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/articles/suspected-sabotage-of-deep-sea-cable-triggers-first-nato-led-response-337119ba" target="_blank">海底光缆疑遭蓄意破坏，北约启动首次协同应对 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：海底光缆疑遭破坏触发北约首次协同响应，直击关键基建安全</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>在又一条海底通信电缆发生疑似蓄意破坏后，北约启动成立以来首次针对关键水下基础设施的协同响应，包括增派护卫舰与海上巡逻机、设立水下基础设施协调机构并共享情报；近年波罗的海与北大西洋多条电缆、天然气管道相继受损，事件被指向灰色地带混合战手段。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>北约与欧盟主张将水下基础设施纳入集体防御与民用防护框架；沿海国家要求加强港口与船队监管并追踪影子舰队；电信运营商与云厂商担忧冗余路径不足导致跨境带宽中断；俄罗斯否认介入，但在法律与外交层面保持对抗姿态。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>海底光缆承载全球绝大部分洲际数据流量，其安全化意味着军民融合防护、卫星备份与多路径冗余成为刚性投资，推升海底电缆、无人潜航器与海洋监测装备需求；同时加速关键基础设施的“主权化”与阵营化，抬高全球数据跨境流动的合规与保险成本。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">海底光缆与通信设备板块、国防军工股、卫星通信运营商、海运与海上保险、欧洲能源与数据中心REITs</span>
+                            </div>
+                            <div class="market-logic">安全事件抬升国防预算与水下监视、光缆修复船队的资本开支预期，军工与通信基础设施标的获得订单驱动型估值溢价；海上保险费率上升推高航运与能源运输成本；数据中心运营商则因冗余路径投资与延迟风险重估，跨境带宽溢价与云服务成本存在上行压力，风险偏好短期受地缘不确定性抑制。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Suspected Sabotage of Deep-Sea Cable Triggers Firs...</span>
+                            <span>Mon, 27 Jan 2025 11:22:00 -0500</span>
+                        </div>
+                    </div>
+            </div>
+
+            <!-- 第二板块：计算技术与开源前沿观察 -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">计算技术与开源工程前沿</span>
+                    <span class="section-code">[SEC-02 / COMPUTING & OPEN SOURCE]</span>
+                </div>
+
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">AI推理系统</span>
+                                <span class="source-tag">GitHub Trending</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.4 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.3</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.6</span> &nbsp;•&nbsp; 
+                            工程落地:<span>8.5</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://github.com/Niko1221/Strata" target="_blank">Strata：消费级硬件一键本地化大模型推理引擎 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：消费级硬件本地跑大模型并兼容主流API，重塑推理部署范式</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>基于C++实现的本地推理引擎，面向Windows与Linux提供一键安装，可在消费级GPU与统一内存设备上运行Qwen系列Flash级模型，并在localhost暴露OpenAI与Anthropic兼容API，支持可选图像输入，形成与云端接口协议对齐的本地推理栈。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>攻克本地部署中量化精度损失、显存与KV缓存管理、算子内核与驱动兼容碎片化三大痛点，把原本需要专业调优的推理环境压缩为一次安装，显著降低单位Token成本与端到端时延，并使敏感数据无需出域即可调用大模型能力。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区关注焦点由“能否本地跑”转向“能否零改造替换云端API”，推动推理层协议标准化与端侧硬件需求上行；技术壁垒从模型权重转向内核优化、显存调度与多后端适配的工程纵深，个人开发者与中小团队得以摆脱对云端配额和计费的依赖。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">公有云推理API（AWS Bedrock、Azure OpenAI）、消费级GPU与统一内存SoC厂商、云端GPU租赁与推理服务商</span>
+                            </div>
+                            <div class="market-logic">本地可替代部分高频、低难度推理调用，令云厂商按Token计费的推理收入增速承压，API定价权被开源兼容层稀释，算力需求由集中式租赁向端侧与私有化部署分流；反过来抬升消费级算力硬件与内存的出货预期，压缩纯推理中间商的毛利空间，迫使云厂商向高价值模型、编排与合规服务上移。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://github.com/Niko1221/Strata" target="_blank">项目原帖: [开源新星] Niko1221/Strata (语言: C++ | ★21712)...</a>
+                            <span class="stat-badge">21712 ★/pts &nbsp;|&nbsp; 2060 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">AI推理系统</span>
+                                <span class="source-tag">GitHub Trending</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.3 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.8</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.1</span> &nbsp;•&nbsp; 
+                            工程落地:<span>7.8</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://github.com/NandhaKishorM/laya" target="_blank">laya：非自回归单次前向多语种决策引擎 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：非自回归单次前向完成多语种决策，突破传统生成式推理时延</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>以Python实现的非自回归System 1决策引擎，通过单次前向传播对任意文本输出类型化选择、评分与是/否判定，覆盖百余种语言，并内置路由模块按请求特征选择匹配的检查点，本质是把生成式范式重构为判别式推理架构。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>绕过逐Token自回归解码带来的时延与算力线性增长，用一次前向完成结构化决策，显著降低延迟与Token成本；同时以类型化输出替代自由文本解析，减少后处理与解析错误，提升多语种场景下判定的稳定性与可观测性。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区关注其能否在意图识别、内容审核、风控路由等高频判别任务上取代大参数生成模型，推动模型架构向“判别优先、生成兜底”的分层生态演进；多检查点路由与多语种一致性成为新的工程壁垒，中小模型在垂直判别场景的性价比优势被放大。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">通用大模型API厂商、内容审核与风控SaaS、客服与自动化决策软件赛道</span>
+                            </div>
+                            <div class="market-logic">单次前向判别把大量轻量推理任务从昂贵的大模型API迁移至小模型自托管，直接侵蚀按调用量计费的通用模型收入结构，并压低审核、客服等场景的单位决策成本；依赖大模型调用封装的应用层中间商护城河被削弱，价值向拥有垂直数据与路由策略的团队转移，推动行业定价由Token计费向结果计费迁移。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://github.com/NandhaKishorM/laya" target="_blank">项目原帖: [开源新星] NandhaKishorM/laya (语言: Python | ★3236...</a>
+                            <span class="stat-badge">32365 ★/pts &nbsp;|&nbsp; 2893 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">AI智能体 / 开源基础设施</span>
+                                <span class="source-tag">GitHub Trending</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.3 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.0</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.4</span> &nbsp;•&nbsp; 
+                            工程落地:<span>8.6</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://github.com/browser-use/jev-ultrafast" target="_blank">jev-ultrafast：极致高速低成本的Web智能体框架 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：以最快最低成本实现Web智能体作业，显著压低Agent落地成本</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>以Python打造的高速Web智能体框架，聚焦浏览器自动化与页面理解的吞吐与成本优化，通过精简观测空间、缓存与并行调度降低每次任务的Token消耗与端到端耗时，定位为可直接嵌入生产流程的Agent运行时。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>针对传统Web Agent动辄数十步推理、页面全量DOM注入导致Token爆炸与超时的痛点，以结构化观测裁剪与调度优化把单任务成本与延迟压至可规模化水平，缓解高并发场景下的稳定性与失败重试开销。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区关注焦点集中在“单位任务成本”与“成功率—成本”权衡曲线，推动Agent评估从演示效果转向生产级SLA；浏览器自动化、抓取与流程编排的开源替代加速，商业RPA与云端浏览器服务的定价面临重估，Agent基础设施层竞争白热化。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">商业RPA与流程自动化厂商、云端浏览器与抓取API服务、企业级Agent平台</span>
+                            </div>
+                            <div class="market-logic">开源框架把Web自动化单任务边际成本大幅压低，压缩商业RPA按席位与流程计费的溢价空间，迫使厂商从工具授权转向结果交付与行业Know-how；同时降低企业自建Agent的门槛，使预算由外部采购转向内部工程与推理算力，重塑自动化赛道的价值分配与并购标的估值。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://github.com/browser-use/jev-ultrafast" target="_blank">项目原帖: [开源新星] browser-use/jev-ultrafast (语言: Python ...</a>
+                            <span class="stat-badge">22637 ★/pts &nbsp;|&nbsp; 1669 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">形式化验证 / AI数学</span>
+                                <span class="source-tag">GitHub Trending</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.2 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>9.0</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.5</span> &nbsp;•&nbsp; 
+                            工程落地:<span>7.2</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://github.com/openai/math" target="_blank">openai/math：基于Lean的形式化数学开源项目 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：以Lean形式化数学基座推进机器定理证明，具备理论级突破</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>基于Lean证明助手构建的形式化数学代码库，围绕定理陈述、证明脚本与可机检证明链展开，将自然语言数学问题转译为可被内核验证的形式化对象，为自动化定理证明与AI数学推理提供可复现的评测与训练基座。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>解决大模型数学推理“答案对但过程不可验证”的根本缺陷，以形式化内核提供零容错的正确性判定，消除奖励作弊与幻觉空间，同时为强化学习提供可自动判分的稠密信号，突破自然语言数学评测的噪声瓶颈。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区关注形式化证明与神经推理的结合路径及其对数学研究的范式冲击，指出该方向同时具备科研价值与安全价值：可作为模型推理能力的硬性标尺，也可外溢至软件与硬件的形式化验证；核心壁垒在于形式化库的规模、证明搜索效率与算力成本。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">前沿模型厂商（OpenAI、DeepMind等）、形式化验证与EDA工具链、高可信软件与芯片验证服务赛道</span>
+                            </div>
+                            <div class="market-logic">可机检的推理基准抬高了模型能力评估门槛，迫使厂商投入更多算力于推理与验证闭环，利好推理算力与训练数据服务；同时把形式化验证从航空航天、芯片等小众高价值领域推向通用软件供应链，重塑EDA与安全审计工具的定价权，长期削弱纯靠规模堆叠的模型叙事溢价。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://github.com/openai/math" target="_blank">项目原帖: [开源新星] openai/math (语言: Lean | ★14116)...</a>
+                            <span class="stat-badge">14116 ★/pts &nbsp;|&nbsp; 1588 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">AI数学 / 科研范式</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 7.7 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.5</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>7.8</span> &nbsp;•&nbsp; 
+                            工程落地:<span>6.8</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://teorth.github.io/tao-web/slides/math-2-0-caltech-2026.pdf" target="_blank">Terence Tao《Math 2.0》：AI重构数学研究范式 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：陶哲轩论述AI驱动数学新范式，指引科研基础设施演进方向</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>
+                            </div>
+                            
+                            
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50043026" target="_blank">项目原帖: Terence Tao: Math 2.0 [pdf]...</a>
+                            <span class="stat-badge">326 ★/pts &nbsp;|&nbsp; 379 评论/分支</span>
+                        </div>
+                    </div>
+            </div>
+
+        </div>
+
+        <!-- 脚注 -->
+        <div class="footer">
+            多源聚合：CNBC Markets、Wall Street Journal、BBC World News、Hacker News、GitHub Trending。<br>
+            多维评级：宏观（地缘战略 / 市场敏感 / 结构外溢），技术（架构突破 / 商业重塑 / 工程落地）。仅供专业研判参考。
+        </div>
+    </div>
+</body>
+</html>
