@@ -27,6 +27,9 @@ __all__ = [
     "HN_TOP_STORIES_LIMIT",
     "IS_CI",
     "MACRO_SOURCES",
+    "MAX_NEWS_AGE_DAYS",
+    "MEMORY_DIR",
+    "MEMORY_FILE",
     "NOTIFICATION_EMAIL",
     "PAGES_BASE_URL",
     "PREVIEW_REPORT_PATH",
@@ -76,12 +79,17 @@ DOCS_DIR = DOCS_ROOT / "world-news"
 ARCHIVES_DIR = DOCS_DIR / "archives"
 PREVIEW_REPORT_PATH = CURRENT_DIR / "preview_report.html"
 
+# 持久化状态路径
+MEMORY_DIR = REPO_ROOT / "state" / "world-news"
+MEMORY_FILE = MEMORY_DIR / "history.json"
+
 # 服务与外部配置
 PAGES_BASE_URL = os.getenv("PAGES_BASE_URL", "https://crimson-and-clover.github.io/daily-actions")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 
-# 准入评分阈值
+# 准入评分与时效阈值
 SCORE_THRESHOLD = 7.0
+MAX_NEWS_AGE_DAYS = 3
 
 # 宏观与财经数据源配置
 MACRO_SOURCES = [

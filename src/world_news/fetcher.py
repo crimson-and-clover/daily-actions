@@ -3,10 +3,12 @@
 包含针对网络波动的自适应重试机制 (HTTPAdapter + Retry)
 """
 
+import calendar
 import html
 import re
 import sys
 from datetime import UTC, datetime, timedelta
+from email.utils import parsedate_to_datetime
 
 import feedparser
 import requests
@@ -23,8 +25,10 @@ from world_news.config import (
     GITHUB_SEARCH_MIN_STARS,
     HN_TOP_STORIES_LIMIT,
     MACRO_SOURCES,
+    MAX_NEWS_AGE_DAYS,
     RETRY_BACKOFF_FACTOR,
 )
+from world_news.memory import WorldNewsMemory
 
 
 def create_retry_session(
@@ -59,16 +63,51 @@ def clean_html(raw_html: str) -> str:
     return html.unescape(re.sub(cleanr, "", raw_html)).strip()
 
 
-def fetch_macro_finance_feeds() -> list:
+def parse_feed_entry_datetime(entry) -> datetime | None:
+    """提取 feedparser entry 的发布或更新时间，统一转换为 UTC timezone-aware datetime"""
+    st = entry.get("published_parsed") or entry.get("updated_parsed")
+    if st:
+        try:
+            return datetime.fromtimestamp(calendar.timegm(st), tz=UTC)
+        except Exception:
+            pass
+
+    for attr in ("published", "updated", "pubDate"):
+        val = entry.get(attr)
+        if val and isinstance(val, str):
+            try:
+                dt = parsedate_to_datetime(val)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+                return dt.astimezone(UTC)
+            except Exception:
+                pass
+            try:
+                dt = datetime.fromisoformat(val)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+                return dt.astimezone(UTC)
+            except Exception:
+                pass
+
+    return None
+
+
+def fetch_macro_finance_feeds(
+    memory: WorldNewsMemory | None = None,
+    max_age_days: int = MAX_NEWS_AGE_DAYS,
+) -> list:
     """
     抓取宏观地缘与财经资本市场候选池：
-    涵盖 BBC World、CNBC Markets、WSJ World，自带网络波动重试
+    涵盖 BBC World、CNBC Markets、WSJ World、Bloomberg Markets，自带网络波动重试，
+    过滤发布超过 max_age_days (默认3天) 的陈旧新闻与已处理历史记录。
     """
     items = []
     seen_titles = set()
     idx = 0
     session = create_retry_session()
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+    cutoff_dt = datetime.now(UTC) - timedelta(days=max_age_days)
 
     for src in MACRO_SOURCES:
         try:
@@ -81,14 +120,24 @@ def fetch_macro_finance_feeds() -> list:
 
             count = 0
             for entry in feed.entries:
+                # 1. 过滤发布时间超过 max_age_days 天的陈旧新闻
+                entry_dt = parse_feed_entry_datetime(entry)
+                if entry_dt and entry_dt < cutoff_dt:
+                    continue
+
                 title = clean_html(entry.title)
+                link = getattr(entry, "link", "")
                 if not title or title in seen_titles:
                     continue
-                seen_titles.add(title)
 
+                # 2. 过滤历史已记录处理的新闻
+                if memory and memory.is_seen(url=link, title=title):
+                    continue
+
+                seen_titles.add(title)
                 summary = clean_html(getattr(entry, "summary", ""))
                 pub = getattr(entry, "published", "").split(" +")[0]
-                items.append({"idx": idx, "source": src["name"], "title": title, "link": entry.link, "summary": summary, "published": pub})
+                items.append({"idx": idx, "source": src["name"], "title": title, "link": link, "summary": summary, "published": pub})
                 idx += 1
                 count += 1
                 if count >= src["limit"]:
@@ -99,14 +148,18 @@ def fetch_macro_finance_feeds() -> list:
     return items
 
 
-def fetch_tech_opensource_feeds() -> list:
+def fetch_tech_opensource_feeds(
+    memory: WorldNewsMemory | None = None,
+    max_age_days: int = MAX_NEWS_AGE_DAYS,
+) -> list:
     """
     抓取科技与开源前沿候选池：
-    涵盖 Hacker News Top 讨论 + GitHub 新晋高星爆发项目，支持连接容错与重试
+    涵盖 Hacker News Top 讨论 + GitHub 新晋高星爆发项目，支持连接容错、3天时效过滤与已处理去重
     """
     items = []
     idx = 0
     session = create_retry_session()
+    cutoff_dt = datetime.now(UTC) - timedelta(days=max_age_days)
 
     # 1. Hacker News Top Stories
     try:
@@ -121,8 +174,20 @@ def fetch_tech_opensource_feeds() -> list:
                     item_resp = get_with_retry(session, item_url, timeout=FETCH_TIMEOUT)
                     if item_resp.status_code == 200:
                         d = item_resp.json()
+                        # 时效过滤：超过指定天数的主题不进入初筛
+                        s_time = d.get("time")
+                        if s_time:
+                            item_dt = datetime.fromtimestamp(s_time, tz=UTC)
+                            if item_dt < cutoff_dt:
+                                continue
+
                         title = clean_html(d.get("title", ""))
                         url = d.get("url", f"https://news.ycombinator.com/item?id={s_id}")
+
+                        # 历史去重过滤
+                        if memory and memory.is_seen(url=url, title=title):
+                            continue
+
                         score = d.get("score", 0)
                         comments = d.get("descendants", 0)
                         items.append(
@@ -156,10 +221,15 @@ def fetch_tech_opensource_feeds() -> list:
             repos = gh_resp.json().get("items", [])
             for r in repos:
                 full_name = r.get("full_name", "")
+                html_url = r.get("html_url", "")
+
+                # 历史去重过滤 (针对已处理推荐过的仓库)
+                if memory and memory.is_seen(url=html_url, title=full_name):
+                    continue
+
                 desc = clean_html(r.get("description", "") or "暂无官方描述")
                 stars = r.get("stargazers_count", 0)
                 lang = r.get("language", "Unknown")
-                html_url = r.get("html_url", "")
 
                 items.append(
                     {
