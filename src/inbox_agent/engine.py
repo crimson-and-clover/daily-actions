@@ -184,9 +184,10 @@ class AgentEngine:
         for e in batch_emails:
             uid = str(e.get("uid", ""))
             m_id = e.get("message_id", "")
-            cat = tracker.triage_status.get(uid)
-            if cat:
-                memory.mark_processed(m_id, is_spam=(cat == "spam"))
+            decision = tracker.triage_decisions.get(uid)
+            if decision and decision.get("triaged"):
+                is_spam = decision.get("destination") == "spam"
+                memory.mark_processed(m_id, is_spam=is_spam)
             else:
                 print(f"  [Notice] 邮件 UID {uid} (Subject: {e.get('subject')}) 未被 Agent 研判处置，保留在 INBOX 且不标记为已处理。")
 

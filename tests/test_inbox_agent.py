@@ -11,10 +11,10 @@ from inbox_agent.memory import InboxMemory
 from inbox_agent.tools import (
     AGENT_TOOLS,
     BatchTracker,
-    CategoryFolderSpec,
+    DestinationSpec,
     ToolContext,
     execute_tool,
-    get_category_spec,
+    get_destination_spec,
     resolve_folder_name,
 )
 
@@ -31,16 +31,16 @@ class TestInboxAgentMemory(unittest.TestCase):
 
     def test_memory_version_and_upgrade(self):
         mem = InboxMemory(filepath=self.temp_file, key=self.test_key)
-        self.assertEqual(mem.data.get("version"), 1)
+        self.assertEqual(mem.data.get("version"), 2)
 
-        # 模拟旧版无 version 数据的升级迁移
+        # 模拟旧版无 version 数据的升级迁移至版本 2
         old_data = {
             "processed_message_ids": ["msg_1"],
             "total_processed": 1,
         }
         mem.data = old_data
         mem.upgrade_schema()
-        self.assertEqual(mem.data["version"], 1)
+        self.assertEqual(mem.data["version"], 2)
         self.assertIn("active_schedules", mem.data)
         self.assertIn("user_preferences", mem.data)
 
@@ -136,7 +136,7 @@ class TestInboxAgentMemory(unittest.TestCase):
 
         # 读取新实例以验证解密载入
         mem2 = InboxMemory(filepath=self.temp_file, key=self.test_key)
-        self.assertEqual(mem2.data.get("version"), 1)
+        self.assertEqual(mem2.data.get("version"), 2)
         self.assertTrue(mem2.is_processed("test-msg-123"))
         prefs = mem2.get_user_preferences()
         self.assertEqual(len(prefs), 1)
@@ -150,8 +150,8 @@ class TestInboxAgentTools(unittest.TestCase):
         self.client_mock.get_notifications_folder_name.return_value = "&V4NXPpDF-"  # 系统通知
         self.client_mock.get_spam_folder_name.return_value = "[Gmail]/Spam"
         self.client_mock.get_trash_folder_name.return_value = "[Gmail]/Trash"
-        self.client_mock.archive_emails.return_value = 2
-        self.client_mock.move_to_spam.return_value = 1
+        self.client_mock.archive_emails.side_effect = lambda uids, **kwargs: len(uids)
+        self.client_mock.move_to_spam.side_effect = lambda uids, **kwargs: len(uids)
         self.client_mock.create_draft.return_value = {"status": "success", "message": "Draft created"}
         self.client_mock.imap = MagicMock()
 
@@ -171,6 +171,8 @@ class TestInboxAgentTools(unittest.TestCase):
         self.assertGreater(len(AGENT_TOOLS), 5)
         names = [t["function"]["name"] for t in AGENT_TOOLS]
         self.assertIn("move_emails", names)
+        self.assertIn("label_emails", names)
+        self.assertIn("mark_email_flags", names)
         self.assertIn("read_email_content", names)
         self.assertIn("create_calendar_event", names)
         self.assertIn("list_calendar_events", names)
@@ -179,31 +181,34 @@ class TestInboxAgentTools(unittest.TestCase):
         self.assertIn("save_user_preference", names)
         self.assertIn("remove_user_preference", names)
 
-    def test_category_triplet_specs(self):
-        spec_m = get_category_spec("marketing", self.client_mock)
-        self.assertIsInstance(spec_m, CategoryFolderSpec)
-        self.assertEqual(spec_m.category, "marketing")
-        self.assertEqual(spec_m.display_name, "商业推广")
-        self.assertEqual(spec_m.folder_id, "&V4NXPpCu-")
+    def test_destination_specs(self):
+        spec_p = get_destination_spec("promotions", self.client_mock)
+        self.assertIsInstance(spec_p, DestinationSpec)
+        self.assertEqual(spec_p.destination, "promotions")
+        self.assertEqual(spec_p.display_name, "商业推广")
+        self.assertEqual(spec_p.folder_id, "&V4NXPpCu-")
 
-        spec_v = get_category_spec("verification_code", self.client_mock)
-        self.assertEqual(spec_v.display_name, "验证码")
-        self.assertEqual(spec_v.folder_id, "INBOX")
+        spec_i = get_destination_spec("inbox", self.client_mock)
+        self.assertEqual(spec_i.display_name, "收件箱")
+        self.assertEqual(spec_i.folder_id, "INBOX")
 
-        spec_f = get_category_spec("finance_banking", self.client_mock)
-        self.assertEqual(spec_f.display_name, "银行与证券")
-        self.assertEqual(spec_f.folder_id, "INBOX")
-
-    def test_invalid_category_raises_error(self):
-        # Tracker 直接抛出异常
         with self.assertRaises(ValueError):
-            self.tracker.mark_triaged("999", category="unknown_cat_xyz")
+            get_destination_spec("non_existent_folder_xyz", self.client_mock)
 
-        # execute_tool 传入非法类别直接抛出异常退出
+    def test_invalid_destination_and_labels_raise_error(self):
+        # 尝试给不存在的 destination 移动
         with self.assertRaises(ValueError):
             execute_tool(
                 "move_emails",
-                {"email_uids": ["999"], "category": "non_existent_category"},
+                {"email_uids": ["999"], "destination": "invalid_dest_xyz"},
+                self.context,
+            )
+
+        # 尝试给不存在的 label 打标签
+        with self.assertRaises(ValueError):
+            execute_tool(
+                "label_emails",
+                {"email_uids": ["999"], "labels": ["invalid_label_xyz"]},
                 self.context,
             )
 
@@ -213,18 +218,67 @@ class TestInboxAgentTools(unittest.TestCase):
         self.assertEqual(resolve_folder_name(self.client_mock, "spam"), "[Gmail]/Spam")
         self.assertEqual(resolve_folder_name(self.client_mock, "INBOX"), "INBOX")
 
-    def test_move_emails_tool(self):
-        self.tracker.register_batch_emails([{"uid": "101", "subject": "促销A"}, {"uid": "102", "subject": "促销B"}])
-        res = execute_tool(
-            "move_emails",
-            {"email_uids": ["101", "102"], "target_folder": "商业推广", "category": "marketing", "tldr": "促销折扣"},
+    def test_orthogonal_three_dimensions_coexistence(self):
+        """核心正交测试：一封邮件同时具备留在 INBOX、多个语义标签、加星标、并提取日历待办"""
+        self.tracker.register_batch_emails([
+            {"uid": "401", "message_id": "msg_bank_401", "subject": "招商银行信用卡账单与还款日通知"},
+            {"uid": "402", "message_id": "msg_promo_402", "subject": "国航会员日机票大促优惠券领取"},
+        ])
+
+        # 邮件 401：打多重标签（银行账单 + 重要），星标置顶，并提取日程事件
+        execute_tool(
+            "label_emails",
+            {"email_uids": ["401"], "labels": ["finance_banking", "important"], "tldr": "信用卡月结账单"},
             self.context,
         )
-        self.assertEqual(res["status"], "success")
-        self.assertEqual(res["moved_count"], 2)
-        self.assertEqual(res["display_name"], "商业推广")
-        self.assertEqual(self.tracker.marketings_moved_count, 2)
-        self.assertEqual(self.tracker.triage_status.get("101"), "marketing")
+        execute_tool(
+            "mark_email_flags",
+            {"email_uids": ["401"], "is_starred": True},
+            self.context,
+        )
+        execute_tool(
+            "create_calendar_event",
+            {
+                "email_uid": "401",
+                "title": "信用卡还款截止日",
+                "event_date": "2026-10-25",
+                "event_time": "18:00",
+                "advance_days": 3,
+            },
+            self.context,
+        )
+
+        dec_401 = self.tracker.triage_decisions["401"]
+        self.assertEqual(dec_401["destination"], "inbox")
+        self.assertIn("finance_banking", dec_401["labels"])
+        self.assertIn("important", dec_401["labels"])
+        self.assertTrue(dec_401["triaged"])
+        self.assertEqual(len(self.tracker.schedules), 1)
+        self.assertEqual(self.tracker.schedules[0]["title"], "信用卡还款截止日")
+
+        # 邮件 402：物理归档至商业推广，同时依然可以提取优惠券截止日到日历待办中！
+        execute_tool(
+            "move_emails",
+            {"email_uids": ["402"], "destination": "promotions", "tldr": "国航促销"},
+            self.context,
+        )
+        execute_tool(
+            "create_calendar_event",
+            {
+                "email_uid": "402",
+                "title": "国航优惠券过期提醒",
+                "event_date": "2026-10-30",
+            },
+            self.context,
+        )
+
+        dec_402 = self.tracker.triage_decisions["402"]
+        self.assertEqual(dec_402["destination"], "promotions")
+        self.assertIn("marketing", dec_402["labels"])
+        self.assertTrue(dec_402["triaged"])
+        self.assertEqual(self.tracker.marketings_moved_count, 1)
+        # 日历池独立拥有 2 条日程！物理去向与日程提取完全解耦正交
+        self.assertEqual(len(self.tracker.schedules), 2)
 
     def test_calendar_management_tools(self):
         self.tracker.register_batch_emails([{"uid": "201", "message_id": "msg_conf_1", "subject": "下周一季度规划会议"}])
@@ -242,7 +296,6 @@ class TestInboxAgentTools(unittest.TestCase):
             self.context,
         )
         self.assertEqual(res_create["status"], "success")
-        self.assertEqual(self.tracker.triage_status.get("201"), "schedule")
         self.assertEqual(len(self.tracker.schedules), 1)
         self.assertEqual(len(self.memory.get_active_schedules()), 1)
 
@@ -266,7 +319,7 @@ class TestInboxAgentTools(unittest.TestCase):
         self.assertEqual(res["status"], "success")
         self.assertEqual(len(self.tracker.created_drafts), 1)
 
-    def test_save_user_preference_tool(self):
+    def test_save_and_remove_user_preference_tool(self):
         res = execute_tool(
             "save_user_preference",
             {"condition": "发件人含 @notification.service.com", "action_rule": "自动归档至系统通知", "reason": "免打扰"},
@@ -277,40 +330,35 @@ class TestInboxAgentTools(unittest.TestCase):
         self.assertEqual(len(prefs), 1)
         self.assertEqual(prefs[0]["action_rule"], "自动归档至系统通知")
 
-    def test_remove_user_preference_tool(self):
-        p = self.memory.add_user_preference("发件人含 @example.com", "标星")
-        pref_id = p["id"]
-        res = execute_tool("remove_user_preference", {"preference_id": pref_id}, self.context)
-        self.assertEqual(res["status"], "success")
+        pref_id = prefs[0]["id"]
+        res_del = execute_tool("remove_user_preference", {"preference_id": pref_id}, self.context)
+        self.assertEqual(res_del["status"], "success")
         self.assertEqual(len(self.memory.get_user_preferences()), 0)
 
-    def test_new_categories_tracking(self):
+    def test_labels_tracking(self):
         self.tracker.register_batch_emails([
             {"uid": "301", "subject": "您的验证码是 889201"},
             {"uid": "302", "subject": "招商银行9月账单与证券结单"},
             {"uid": "303", "subject": "北京市税务局纳税人通知公函"},
         ])
         execute_tool(
-            "move_emails",
-            {"email_uids": ["301"], "category": "verification_code", "tldr": "登录验证码"},
+            "label_emails",
+            {"email_uids": ["301"], "labels": ["verification_code"], "tldr": "登录验证码"},
             self.context,
         )
         execute_tool(
-            "mark_email_flags",
-            {"email_uids": ["302"], "category": "finance_banking", "is_starred": True, "tldr": "月度对账单"},
+            "label_emails",
+            {"email_uids": ["302"], "labels": ["finance_banking"], "tldr": "月度对账单"},
             self.context,
         )
         execute_tool(
-            "mark_email_flags",
-            {"email_uids": ["303"], "category": "government_affairs", "is_starred": True, "tldr": "税务公函"},
+            "label_emails",
+            {"email_uids": ["303"], "labels": ["government_affairs"], "tldr": "税务公函"},
             self.context,
         )
         self.assertEqual(len(self.tracker.verification_codes), 1)
         self.assertEqual(len(self.tracker.finance_bankings), 1)
         self.assertEqual(len(self.tracker.government_affairs), 1)
-        self.assertEqual(self.tracker.triage_status["301"], "verification_code")
-        self.assertEqual(self.tracker.triage_status["302"], "finance_banking")
-        self.assertEqual(self.tracker.triage_status["303"], "government_affairs")
 
 
 class TestIMAPAndPrompts(unittest.TestCase):

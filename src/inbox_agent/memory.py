@@ -31,7 +31,7 @@ class InboxMemory:
                 print("[Security Warning] 未检测到 INBOX_STATE_KEY，请运行 `uv run python scripts/generate_inbox_key.py` 生成密钥配置到 .env！", file=sys.stderr)
 
         self.data = {
-            "version": 1,
+            "version": 2,
             "processed_message_ids": [],
             "history_processed_ids": [],
             "spam_message_ids": [],
@@ -48,13 +48,16 @@ class InboxMemory:
         """升级数据版本与结构，确保向后兼容"""
         current_version = self.data.get("version", 0)
         if current_version < 1:
-            self.data.setdefault("version", 1)
             self.data.setdefault("processed_message_ids", [])
             self.data.setdefault("history_processed_ids", [])
             self.data.setdefault("spam_message_ids", [])
             self.data.setdefault("active_schedules", [])
             self.data.setdefault("user_preferences", [])
             self.data["version"] = 1
+
+        if current_version < 2:
+            # 升级到版本 2：支持正交三维结构（去向、多标签、日程解耦）
+            self.data["version"] = 2
 
     def load(self):
         if not self.filepath.exists():
