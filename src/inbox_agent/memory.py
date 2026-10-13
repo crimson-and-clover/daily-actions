@@ -1,5 +1,6 @@
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -10,9 +11,9 @@ from inbox_agent.config import INBOX_STATE_KEY, IS_CI, MEMORY_FILE, get_now_bjt
 class InboxMemory:
     """长期状态记录器：记录已分类邮件 ID 与日程池，使用 Fernet (AES-128-CBC + HMAC) 密文持久化"""
 
-    def __init__(self, filepath: Path = MEMORY_FILE):
+    def __init__(self, filepath: Path = MEMORY_FILE, key: str | None = None):
         self.filepath = filepath
-        self.key = INBOX_STATE_KEY
+        self.key = key or INBOX_STATE_KEY
         self.fernet = None
         if self.key:
             try:
@@ -29,6 +30,7 @@ class InboxMemory:
                 print("[Security Warning] 未检测到 INBOX_STATE_KEY，请运行 `uv run python scripts/generate_inbox_key.py` 生成密钥配置到 .env！", file=sys.stderr)
 
         self.data = {
+            "version": 1,
             "processed_message_ids": [],
             "history_processed_ids": [],
             "spam_message_ids": [],
@@ -39,6 +41,15 @@ class InboxMemory:
             "active_schedules": [],
         }
         self.load()
+
+    def upgrade_schema(self, content_version: int):
+        """升级数据版本与结构，确保从 0 平滑升级到 1"""
+        if content_version < 1:
+            self.data.setdefault("processed_message_ids", [])
+            self.data.setdefault("history_processed_ids", [])
+            self.data.setdefault("spam_message_ids", [])
+            self.data.setdefault("active_schedules", [])
+            self.data["version"] = 1
 
     def load(self):
         if not self.filepath.exists():
@@ -56,8 +67,10 @@ class InboxMemory:
                 return
             decrypted_bytes = self.fernet.decrypt(encrypted_bytes)
             content = json.loads(decrypted_bytes.decode("utf-8"))
+            content_version = content.get("version", 0)
             self.data.update(content)
-            print(f"[Memory Loaded] 加密状态已成功解密加载 ({len(self.data.get('processed_message_ids', []))} 封日常历史, {len(self.data.get('history_processed_ids', []))} 封积压历史已处理, {len(self.data.get('active_schedules', []))} 条待办日程)")
+            self.upgrade_schema(content_version)
+            print(f"[Memory Loaded] 加密状态已成功解密加载 (Schema v{self.data.get('version', 1)}, {len(self.data.get('processed_message_ids', []))} 封日常历史, {len(self.data.get('history_processed_ids', []))} 封积压历史已处理, {len(self.data.get('active_schedules', []))} 条待办日程)")
         except InvalidToken:
             print("[Memory Security Error] 解密失败：INBOX_STATE_KEY 密钥不匹配或数据已被篡改！", file=sys.stderr)
             if IS_CI:
@@ -105,7 +118,7 @@ class InboxMemory:
                 self.data["spam_message_ids"].append(message_id)
                 if len(self.data["spam_message_ids"]) > 3000:
                     self.data["spam_message_ids"] = self.data["spam_message_ids"][-2000:]
-            self.data["total_spam_filtered"] = self.data.get("total_spam_filtered", 0) + 1
+                self.data["total_spam_filtered"] = self.data.get("total_spam_filtered", 0) + 1
 
     def mark_history_processed(self, message_id: str):
         """历史 CI 专用：标记该历史邮件已被 History Agent 研判处置"""
@@ -123,25 +136,41 @@ class InboxMemory:
         self.data["total_pruned_90d"] = self.data.get("total_pruned_90d", 0) + count
 
     def add_schedule(self, schedule_item: dict):
-        """将包含具体日期 (event_date) 的日程及提前预警天数 (advance_days) 持久化保存到待办日历池中"""
+        """将包含具体日期 (event_date) 的日程及提前预警天数 (advance_days) 持久化保存到待办日历池中，按 RFC 822 Message-ID 去重"""
         event_date = (schedule_item.get("event_date") or "").strip()
         if not event_date:
             return
         if "active_schedules" not in self.data:
             self.data["active_schedules"] = []
 
-        # 检查是否已有相同 message_id 或相同主题和时间的日程
-        msg_id = schedule_item.get("message_id")
+        msg_id = (schedule_item.get("message_id") or "").strip()
+        title = (schedule_item.get("title") or schedule_item.get("subject") or "").strip()
+
+        # 依据 RFC 822 Message-ID 检查是否已有相同日程（支持改期/重新提醒覆盖）
         for existing in self.data["active_schedules"]:
             if msg_id and existing.get("message_id") == msg_id:
+                existing.update({
+                    "message_id": msg_id,
+                    "title": title,
+                    "subject": schedule_item.get("subject", existing.get("subject", title)),
+                    "from": schedule_item.get("from", existing.get("from", "")),
+                    "tldr": schedule_item.get("tldr", existing.get("tldr", "")),
+                    "action_items": schedule_item.get("action_items", existing.get("action_items", [])),
+                    "event_time": schedule_item.get("event_time", existing.get("event_time", "")),
+                    "event_date": event_date,
+                    "advance_days": schedule_item.get("advance_days", existing.get("advance_days", 3)),
+                    "priority": schedule_item.get("priority", existing.get("priority", "P1")),
+                    "updated_at": get_now_bjt().strftime("%Y-%m-%d %H:%M:%S"),
+                })
                 return
-            if existing.get("subject") == schedule_item.get("subject") and existing.get("event_date") == event_date:
+            elif not msg_id and title and existing.get("title") == title and existing.get("event_date") == event_date:
                 return
 
         self.data["active_schedules"].append(
             {
                 "message_id": msg_id,
-                "subject": schedule_item.get("subject", ""),
+                "title": title,
+                "subject": schedule_item.get("subject", title),
                 "from": schedule_item.get("from", ""),
                 "tldr": schedule_item.get("tldr", ""),
                 "action_items": schedule_item.get("action_items", []),
@@ -163,7 +192,6 @@ class InboxMemory:
         """
         if "active_schedules" not in self.data:
             return []
-        from datetime import datetime
 
         dt_today = datetime.strptime(today_str, "%Y-%m-%d")
 
@@ -213,8 +241,6 @@ class InboxMemory:
             else:
                 # 简单日期比较保留 3 天
                 try:
-                    from datetime import datetime
-
                     dt_ev = datetime.strptime(ev_date, "%Y-%m-%d")
                     dt_now = datetime.strptime(today_str, "%Y-%m-%d")
                     if (dt_now - dt_ev).days <= 3:
@@ -222,6 +248,50 @@ class InboxMemory:
                 except (ValueError, TypeError):
                     pass
         self.data["active_schedules"] = retained
+
+    def get_active_schedules(self) -> list[dict]:
+        """获取当前所有活跃待办日程"""
+        return list(self.data.get("active_schedules", []))
+
+    def remove_schedule(
+        self,
+        message_id: str | None = None,
+        subject: str | None = None,
+        event_date: str | None = None,
+    ) -> list[dict]:
+        """
+        从日程池中移除匹配的日程条目（如会议取消、改期重置等）。
+        返回被移除的日程条目列表。
+        """
+        if "active_schedules" not in self.data:
+            return []
+
+        retained = []
+        removed = []
+        sub_query = (subject or "").strip().lower()
+        date_query = (event_date or "").strip()
+
+        for item in self.data["active_schedules"]:
+            match = False
+            item_msg_id = item.get("message_id")
+            item_sub = item.get("subject", "").lower()
+            item_date = item.get("event_date", "")
+
+            if message_id and item_msg_id and item_msg_id == message_id:
+                match = True
+            elif sub_query and sub_query in item_sub:
+                if not date_query or item_date == date_query:
+                    match = True
+            elif date_query and item_date == date_query and not sub_query:
+                match = True
+
+            if match:
+                removed.append(item)
+            else:
+                retained.append(item)
+
+        self.data["active_schedules"] = retained
+        return removed
 
     def save(self):
         self.filepath.parent.mkdir(parents=True, exist_ok=True)

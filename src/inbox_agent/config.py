@@ -9,6 +9,7 @@ from utils.timezone import BJT, get_now_bjt
 load_dotenv()
 
 __all__ = [
+    "BATCH_SIZE",
     "BJT",
     "DEEPSEEK_API_KEY",
     "DEEPSEEK_MODEL",
@@ -18,6 +19,7 @@ __all__ = [
     "GMAIL_USER",
     "INBOX_STATE_KEY",
     "IS_CI",
+    "MAX_AGENT_TURNS",
     "MAX_EMAILS_PER_RUN",
     "MEMORY_FILE",
     "NOTIFICATION_EMAIL",
@@ -70,8 +72,10 @@ TEMPLATES_HTML_DIR = CURRENT_DIR / "templates" / "html"
 # 运行参数
 FETCH_DAYS_LIMIT = 30  # 拉取近期邮件窗口 (支持回溯积压)
 MAX_EMAILS_PER_RUN = 100  # 单次处理的最大邮件数量提升至 100 封，新到旧优先处理
+BATCH_SIZE = 10  # 批次大小：每批 10 封交给 Agent 进行 ReAct 多轮决策
+MAX_AGENT_TURNS = 100  # 单批次 Agent 最大思考与工具调用轮数
 PRUNE_DAYS = 90  # 自动清理 90 天以上的低价值/营销垃圾邮件
 
 # DeepSeek 配置
-DEEPSEEK_MODEL = "deepseek-flash"
+DEEPSEEK_MODEL = (os.getenv("DEEPSEEK_MODEL") or "deepseek-flash").strip()
 DEEPSEEK_TIMEOUT = 30.0

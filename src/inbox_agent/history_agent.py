@@ -13,6 +13,7 @@ Inbox History Agent (收件箱历史邮件归档与清理智能体)
 """
 
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 from inbox_agent.classifier import classify_history_email
@@ -26,7 +27,7 @@ from inbox_agent.config import (
     get_now_bjt,
     validate_config,
 )
-from inbox_agent.imap_client import GmailClient
+from inbox_agent.imap import ImapConnection, LabelService, MessageRepo
 from inbox_agent.memory import InboxMemory
 from inbox_agent.renderer import render_history_email_report
 from utils.mailer import send_email_html
@@ -38,40 +39,62 @@ def main():
     print(f"=== [Inbox History Agent] 启动历史邮件清理与归档任务 ({now_dt.strftime('%Y-%m-%d %H:%M:%S')} BJT) ===")
 
     memory = InboxMemory()
-    client = GmailClient(username=GMAIL_USER, password=GMAIL_APP_PASS)
+    conn = ImapConnection(username=GMAIL_USER, password=GMAIL_APP_PASS)
 
     print(f"[IMAP] 正在连接 Gmail 检查早于 {PRUNE_DAYS} 天的历史邮件 (旧 -> 新)...")
-    if not client.connect():
-        print("[IMAP Fatal Error] Gmail 登录/鉴权失败，请检查凭据", file=sys.stderr)
+    try:
+        conn.connect()
+    except Exception as e:
+        print(f"[IMAP Fatal Error] Gmail 登录/鉴权失败: {e}", file=sys.stderr)
         sys.exit(1)
+
+    repo = MessageRepo(conn)
+    label_service = LabelService(conn)
+
+    before_date = (now_dt - timedelta(days=PRUNE_DAYS)).strftime("%d-%b-%Y")
+    criteria = ["BEFORE", before_date]
 
     try:
         # 严格按最旧到较新抓取未处理历史邮件，最大 100 封
-        raw_old_emails = client.fetch_old_emails(
-            days=PRUNE_DAYS,
-            max_count=100,
+        raw_old_emails = repo.fetch_emails(
+            code="inbox",
+            criteria=criteria,
+            limit=100,
+            reverse=False,
             is_processed_func=memory.is_history_processed,
         )
         print(f"[IMAP] 抓取到待研判历史邮件: {len(raw_old_emails)} 封")
     except Exception as e:
         print(f"[IMAP Fatal Error] 获取历史邮件异常: {e}", file=sys.stderr)
-        client.close()
+        conn.close()
         sys.exit(1)
 
     if not raw_old_emails:
         print(f"[Inbox History Agent] 收件箱中没有超过 {PRUNE_DAYS} 天的未处理历史邮件，任务完成。")
-        client.close()
+        conn.close()
         return
+
+    old_email_dicts = [
+        {
+            "uid": e.uid,
+            "message_id": e.message_id,
+            "subject": e.subject,
+            "from": e.from_addr,
+            "to": e.to_addr,
+            "date": e.date,
+            "snippet": e.snippet,
+            "body": e.body,
+            "attachments": e.attachments,
+            "unsubscribe_link": e.unsubscribe_link,
+        }
+        for e in raw_old_emails
+    ]
 
     # 分批执行配置 (每 10 封为一个 batch，边研判边执行并即时持久化)
     BATCH_SIZE = 10
-    total_emails = len(raw_old_emails)
+    total_emails = len(old_email_dicts)
     total_batches = (total_emails + BATCH_SIZE - 1) // BATCH_SIZE
     print(f"[AI 研判] 开始分批分析 {total_emails} 封收件箱历史邮件 (每批 {BATCH_SIZE} 封，共 {total_batches} 批，边研判边转移)...")
-
-    # 预先获取并缓存目标文件夹，避免在批次循环中重复请求 folder list
-    notif_folder = client.get_notifications_folder_name()
-    promo_folder = client.get_promotions_folder_name()
 
     deleted_count = 0
     notif_archived_count = 0
@@ -81,22 +104,22 @@ def main():
     processed_count = 0
 
     for batch_idx in range(0, total_emails, BATCH_SIZE):
-        batch = raw_old_emails[batch_idx : batch_idx + BATCH_SIZE]
+        batch = old_email_dicts[batch_idx : batch_idx + BATCH_SIZE]
         batch_num = (batch_idx // BATCH_SIZE) + 1
         print(f"\n--- [批次 {batch_num}/{total_batches}] 正在研判 {len(batch)} 封邮件 ---")
 
-        batch_to_delete = []
-        batch_to_notif = []
-        batch_to_promo = []
-        batch_to_archive = []
+        batch_to_delete: list[int] = []
+        batch_to_notif: list[int] = []
+        batch_to_promo: list[int] = []
+        batch_to_archive: list[int] = []
 
         for item in batch:
             # 心跳保活：防止 LLM 研判期间 IMAP 连接因闲置超时被断开
-            if client.imap:
-                client.noop()
+            if conn.is_connected():
+                conn.noop()
 
             m_id = item.get("message_id")
-            uid = item.get("uid")
+            uid = int(item.get("uid"))
             subject = item.get("subject", "无主题")
 
             decision = classify_history_email(item, DEEPSEEK_API_KEY, my_email=GMAIL_USER)
@@ -131,25 +154,26 @@ def main():
             processed_count += 1
 
         # 本批次研判完成，立即执行 IMAP 批量动作
-        if client.imap:
-            if batch_to_delete:
-                b_del = client.move_to_trash(batch_to_delete)
-                deleted_count += b_del
-                memory.record_pruned(b_del)
-            if batch_to_notif:
-                notif_archived_count += client.archive_emails(batch_to_notif, folder_name=notif_folder)
-            if batch_to_promo:
-                promo_archived_count += client.archive_emails(batch_to_promo, folder_name=promo_folder)
-            if batch_to_archive:
-                gen_archived_count += client.archive_emails(batch_to_archive, folder_name="归档")
+        if batch_to_delete:
+            label_service.set_labels(batch_to_delete, add=["trash"], remove=["inbox"])
+            deleted_count += len(batch_to_delete)
+            memory.record_pruned(len(batch_to_delete))
+        if batch_to_notif:
+            label_service.set_labels(batch_to_notif, add=["system_notification"], remove=["inbox"])
+            notif_archived_count += len(batch_to_notif)
+        if batch_to_promo:
+            label_service.set_labels(batch_to_promo, add=["promotions"], remove=["inbox"])
+            promo_archived_count += len(batch_to_promo)
+        if batch_to_archive:
+            label_service.set_labels(batch_to_archive, add=["archive"], remove=["inbox"])
+            gen_archived_count += len(batch_to_archive)
 
         # 核心：每完成一个批次立即持久化保存加密记忆库！
         # 即使后续网络异常或 CI 中途超时，前面已处理的批次也绝对不会丢失
         memory.save()
         print(f"  [批次 {batch_num}/{total_batches} 落地完毕] 已累计: 废纸篓 {deleted_count} | 系统通知 {notif_archived_count} | 商业推广 {promo_archived_count} | 通用归档 {gen_archived_count} | 保留 {len(kept_items)}")
 
-    if client.imap:
-        client.close()
+    conn.close()
 
     # 汇报简报
     date_str = now_dt.strftime("%Y-%m-%d")
