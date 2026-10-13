@@ -187,6 +187,7 @@ class GmailClient:
         self._promotions_folder = None
         self._notifications_folder = None
         self._spam_folder = None
+        self._drafts_folder = None
 
     def connect(self) -> bool:
         if not self.username or not self.password:
@@ -731,3 +732,239 @@ class GmailClient:
         old_ids = data[0].split()
         old_uids = [oid.decode() for oid in old_ids[:50]]
         return self.move_to_trash(old_uids)
+
+    def get_drafts_folder_name(self) -> str:
+        """检测草稿箱名称 (基于 RFC 6154 Special-Use 属性自适应中英文环境)"""
+        if self._drafts_folder:
+            return self._drafts_folder
+        if not self.ensure_connected():
+            return "[Gmail]/Drafts"
+        try:
+            status, folder_list = self.imap.list()
+            if status == "OK" and folder_list:
+                for f in folder_list:
+                    flags, name = parse_folder_name_from_list_line(f)
+                    flags_lower = flags.lower()
+                    name_lower = name.lower()
+                    if r"\drafts" in flags_lower:
+                        self._drafts_folder = name
+                        return name
+                    if "draft" in name_lower or "草稿" in name or "&g0l6pw-" in name_lower:
+                        self._drafts_folder = name
+                        return name
+        except Exception as e:
+            print(f"[IMAP Warning] 获取草稿箱目录失败: {e}")
+        self._drafts_folder = "[Gmail]/Drafts"
+        return self._drafts_folder
+
+    def create_draft(self, to: list[str] | str, subject: str, body: str, in_reply_to: str = "") -> dict:
+        """在 Gmail 草稿箱创建一封草稿邮件"""
+        if not self.ensure_connected():
+            return {"status": "error", "message": "IMAP 未连接"}
+        import time
+        from email.header import Header
+        from email.message import EmailMessage
+
+        draft_folder = self.get_drafts_folder_name()
+        msg = EmailMessage()
+        msg["From"] = self.username
+        msg["To"] = ", ".join(to) if isinstance(to, list) else str(to)
+        msg["Subject"] = Header(subject, "utf-8").encode()
+        if in_reply_to:
+            msg["In-Reply-To"] = in_reply_to
+            msg["References"] = in_reply_to
+        msg.set_content(body)
+
+        try:
+            res, _ = self.imap.append(
+                draft_folder,
+                r"(\Draft \Seen)",
+                imaplib.Time2Internaldate(time.time()),
+                msg.as_bytes(),
+            )
+            if res == "OK":
+                return {
+                    "status": "success",
+                    "message": f"草稿已成功保存至 {mutf7_decode(draft_folder)}",
+                    "to": to,
+                    "subject": subject,
+                }
+            return {"status": "error", "message": f"IMAP append 失败: {res}"}
+        except Exception as e:
+            return {"status": "error", "message": f"创建草稿异常: {e}"}
+
+    def search_emails(self, query: str = "", folder: str = "INBOX", unread_only: bool = False, sender: str = "", limit: int = 10) -> list[dict]:
+        """按关键词、发件人、未读状态检索邮件元数据"""
+        if not self.ensure_connected():
+            return []
+        try:
+            st, _ = self.imap.select(folder)
+            if st != "OK":
+                return []
+
+            criteria = []
+            if unread_only:
+                criteria.append("UNSEEN")
+            if sender:
+                criteria.extend(["FROM", f'"{sender}"'])
+
+            search_str = " ".join(criteria) if criteria else "ALL"
+            if query:
+                try:
+                    res, data = self.imap.uid("SEARCH", None, f'X-GM-RAW "{query}"')
+                    if res != "OK" or not data or not data[0]:
+                        res, data = self.imap.uid("SEARCH", None, f'(TEXT "{query}")')
+                except Exception:
+                    res, data = self.imap.uid("SEARCH", None, f'(TEXT "{query}")')
+            else:
+                res, data = self.imap.uid("SEARCH", None, search_str)
+
+            if res != "OK" or not data or not data[0]:
+                return []
+
+            uids = data[0].split()
+            selected_uids = [u.decode() for u in reversed(uids)][:limit]
+            results = []
+            for uid in selected_uids:
+                try:
+                    fetch_res, fetch_data = self.imap.uid("FETCH", uid, "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE MESSAGE-ID)] BODY.PEEK[TEXT]<0.600>)")
+                    if fetch_res != "OK" or not fetch_data:
+                        continue
+                    raw_header = b""
+                    raw_snippet = b""
+                    for part in fetch_data:
+                        if isinstance(part, tuple) and len(part) >= 2:
+                            if b"HEADER" in part[0]:
+                                raw_header = part[1]
+                            elif b"TEXT" in part[0]:
+                                raw_snippet = part[1]
+                    msg = email.message_from_bytes(raw_header)
+                    subject = decode_str(msg.get("Subject", "无主题"))
+                    from_addr = decode_str(msg.get("From", "未知发件人"))
+                    date_str = msg.get("Date", "")
+                    message_id = msg.get("Message-ID", "")
+                    clean_snip = raw_snippet.decode("utf-8", errors="ignore").replace("\r", " ").replace("\n", " ").strip()[:200]
+                    results.append({
+                        "uid": uid,
+                        "folder": folder,
+                        "subject": subject,
+                        "from": from_addr,
+                        "date": date_str,
+                        "message_id": message_id,
+                        "snippet": clean_snip,
+                    })
+                except Exception:
+                    continue
+            return results
+        except Exception as e:
+            print(f"[IMAP Warning] 搜索邮件失败: {e}")
+            return []
+
+    def read_email_content(self, email_uid: str, folder: str = "INBOX", max_length: int = 4000) -> dict:
+        """按 UID 读取单封邮件的完整正文及附件信息"""
+        if not self.ensure_connected():
+            return {"status": "error", "message": "IMAP 未连接"}
+        try:
+            st, _ = self.imap.select(folder)
+            if st != "OK":
+                return {"status": "error", "message": f"无法选择文件夹 {folder}"}
+
+            res, data = self.imap.uid("FETCH", email_uid, "(RFC822)")
+            if res != "OK" or not data or not data[0]:
+                return {"status": "error", "message": f"未找到 UID 为 {email_uid} 的邮件"}
+
+            raw_email = None
+            for item in data:
+                if isinstance(item, tuple) and len(item) >= 2:
+                    raw_email = item[1]
+                    break
+            if not raw_email:
+                return {"status": "error", "message": "未能读取到邮件原始内容"}
+
+            msg = email.message_from_bytes(raw_email)
+            subject = decode_str(msg.get("Subject", "无主题"))
+            from_addr = decode_str(msg.get("From", "未知发件人"))
+            to_addr = decode_str(msg.get("To", ""))
+            date_str = msg.get("Date", "")
+            message_id = msg.get("Message-ID", "")
+
+            body_text, raw_html = extract_email_body_and_html(msg)
+            unsub_link = extract_unsubscribe_link(msg, raw_html)
+
+            attachments = []
+            for part in msg.walk():
+                if part.get_content_maintype() == "multipart":
+                    continue
+                filename = part.get_filename()
+                if filename:
+                    fname = decode_str(filename)
+                    payload = part.get_payload(decode=True) or b""
+                    attachments.append({
+                        "filename": fname,
+                        "content_type": part.get_content_type(),
+                        "size_bytes": len(payload),
+                    })
+
+            truncated = False
+            if len(body_text) > max_length:
+                body_text = body_text[:max_length] + f"\n\n[正文已截断，总长度 {len(body_text)} 字符]"
+                truncated = True
+
+            return {
+                "status": "success",
+                "uid": email_uid,
+                "folder": folder,
+                "subject": subject,
+                "from": from_addr,
+                "to": to_addr,
+                "date": date_str,
+                "message_id": message_id,
+                "body": body_text,
+                "attachments": attachments,
+                "unsubscribe_link": unsub_link,
+                "truncated": truncated,
+            }
+        except Exception as e:
+            return {"status": "error", "message": f"读取邮件正文失败: {e}"}
+
+    def mark_email_flags(self, email_uids: list[str], is_read: bool | None = None, is_starred: bool | None = None, folder: str = "INBOX") -> dict:
+        """标记邮件已读/未读或星标状态"""
+        if not email_uids or not self.ensure_connected():
+            return {"status": "error", "message": "UID 为空或 IMAP 未连接"}
+        try:
+            st, _ = self.imap.select(folder)
+            if st != "OK":
+                return {"status": "error", "message": f"无法选择文件夹 {folder}"}
+            uid_str = ",".join(str(u) for u in email_uids)
+            if is_read is True:
+                self.imap.uid("STORE", uid_str, "+FLAGS", "(\\Seen)")
+            elif is_read is False:
+                self.imap.uid("STORE", uid_str, "-FLAGS", "(\\Seen)")
+            if is_starred is True:
+                self.imap.uid("STORE", uid_str, "+FLAGS", "(\\Flagged)")
+            elif is_starred is False:
+                self.imap.uid("STORE", uid_str, "-FLAGS", "(\\Flagged)")
+            return {"status": "success", "modified_count": len(email_uids), "uids": email_uids}
+        except Exception as e:
+            return {"status": "error", "message": f"标记邮件失败: {e}"}
+
+    def list_folders(self) -> list[dict]:
+        """获取所有可用文件夹列表及其解码名称"""
+        if not self.ensure_connected():
+            return []
+        try:
+            status, folder_list = self.imap.list()
+            if status != "OK" or not folder_list:
+                return []
+            results = []
+            for f in folder_list:
+                flags, name = parse_folder_name_from_list_line(f)
+                results.append({
+                    "raw_name": name,
+                    "display_name": mutf7_decode(name),
+                    "flags": flags,
+                })
+            return results
+        except Exception as e:
+            print(f"[IMAP Warning] 列出文件夹失败: {e}")
+            return []

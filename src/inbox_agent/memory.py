@@ -37,6 +37,7 @@ class InboxMemory:
             "total_spam_filtered": 0,
             "total_pruned_90d": 0,
             "active_schedules": [],
+            "user_preferences": [],
         }
         self.load()
 
@@ -222,6 +223,64 @@ class InboxMemory:
                 except (ValueError, TypeError):
                     pass
         self.data["active_schedules"] = retained
+
+    def get_user_preferences(self) -> list[dict]:
+        """获取所有已持久化的用户偏好规则"""
+        return list(self.data.get("user_preferences", []))
+
+    def add_user_preference(self, condition: str, action_rule: str, reason: str = "") -> dict:
+        """
+        添加或更新用户偏好规则。
+        若已有相同 condition 则更新，否则追加。
+        """
+        import uuid
+
+        condition = (condition or "").strip()
+        action_rule = (action_rule or "").strip()
+        reason = (reason or "").strip()
+        if not condition or not action_rule:
+            return {}
+
+        prefs = self.data.setdefault("user_preferences", [])
+        for item in prefs:
+            if item.get("condition", "").lower() == condition.lower():
+                item["action_rule"] = action_rule
+                if reason:
+                    item["reason"] = reason
+                item["updated_at"] = get_now_bjt().strftime("%Y-%m-%d %H:%M:%S")
+                return item
+
+        pref_item = {
+            "id": f"pref_{uuid.uuid4().hex[:8]}",
+            "condition": condition,
+            "action_rule": action_rule,
+            "reason": reason,
+            "created_at": get_now_bjt().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        prefs.append(pref_item)
+        if len(prefs) > 100:
+            self.data["user_preferences"] = prefs[-100:]
+        return pref_item
+
+    def remove_user_preference(self, pref_id: str) -> bool:
+        """删除指定 ID 的用户偏好"""
+        prefs = self.data.get("user_preferences", [])
+        initial_len = len(prefs)
+        self.data["user_preferences"] = [p for p in prefs if p.get("id") != pref_id]
+        return len(self.data["user_preferences"]) < initial_len
+
+    def format_preferences_for_prompt(self) -> str:
+        """将用户偏好格式化为注入 System Prompt 的指导文案"""
+        prefs = self.get_user_preferences()
+        if not prefs:
+            return "暂无特别定制的用户个人偏好规则，请遵循常规邮件整理准则。"
+        lines = []
+        for idx, p in enumerate(prefs, 1):
+            rule_str = f"{idx}. [触发条件]: {p.get('condition')} => [执行准则]: {p.get('action_rule')}"
+            if p.get("reason"):
+                rule_str += f" (原因/备注: {p.get('reason')})"
+            lines.append(rule_str)
+        return "\n".join(lines)
 
     def save(self):
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
