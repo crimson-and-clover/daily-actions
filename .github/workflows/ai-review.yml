@@ -1,0 +1,94 @@
+name: OpenHands AI PR Review
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  ai-review:
+    # 满足以下任一条件时执行：
+    # 1. PR 刚创建打开 (pull_request opened)
+    # 2. PR 评论中包含 /ai-review 指令且由作者/协作者触发 (issue_comment created)
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '/ai-review') &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Fetch PR Details
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefName,headRepository,baseRefName,title,number > pr_info.json
+          
+          echo "head_ref=$(jq -r .headRefName pr_info.json)" >> "$GITHUB_OUTPUT"
+          echo "head_repo=$(jq -r .headRepository.nameWithOwner pr_info.json)" >> "$GITHUB_OUTPUT"
+          echo "base_ref=$(jq -r .baseRefName pr_info.json)" >> "$GITHUB_OUTPUT"
+          echo "title=$(jq -r .title pr_info.json)" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$(jq -r .number pr_info.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout OpenHands extensions
+        uses: actions/checkout@v7
+        with:
+          repository: OpenHands/extensions
+          path: extensions
+
+      - name: Checkout PR repository
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ steps.pr.outputs.head_repo }}
+          ref: ${{ steps.pr.outputs.head_ref }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: pr-repo
+          submodules: recursive
+
+      - name: Fetch Base Branch for Diff
+        working-directory: pr-repo
+        run: |
+          git remote add upstream "https://github.com/${{ github.repository }}.git" 2>/dev/null || true
+          git fetch upstream "${{ steps.pr.outputs.base_ref }}:${{ steps.pr.outputs.base_ref }}" 2>/dev/null || git fetch origin "${{ steps.pr.outputs.base_ref }}:${{ steps.pr.outputs.base_ref }}" 2>/dev/null || true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Run OpenHands PR Review
+        shell: bash
+        env:
+          UV_PYTHON: '3.12'
+          OPENHANDS_SDK_PACKAGE: 'openhands-sdk'
+          AGENT_KIND: 'openhands'
+          LLM_MODEL: 'deepseek/deepseek-flash'
+          LLM_BASE_URL: 'https://api.deepseek.com'
+          LLM_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          USE_SUB_AGENTS: 'false'
+          LOAD_PUBLIC_SKILLS: 'true'
+          COLLECT_FEEDBACK: 'true'
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          PR_TITLE: ${{ steps.pr.outputs.title }}
+          PR_BASE_BRANCH: ${{ steps.pr.outputs.base_ref }}
+          PR_HEAD_BRANCH: ${{ steps.pr.outputs.head_ref }}
+          REPO_NAME: ${{ github.repository }}
+          REVIEW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          cd pr-repo
+          uv run --no-project --with "$OPENHANDS_SDK_PACKAGE" --with openhands-tools --with lmnr \
+            python ../extensions/plugins/pr-review/scripts/agent_script.py
+
