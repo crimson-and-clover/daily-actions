@@ -1,5 +1,7 @@
 import json
 import sys
+import uuid
+from datetime import datetime
 from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -164,7 +166,6 @@ class InboxMemory:
         """
         if "active_schedules" not in self.data:
             return []
-        from datetime import datetime
 
         dt_today = datetime.strptime(today_str, "%Y-%m-%d")
 
@@ -214,8 +215,6 @@ class InboxMemory:
             else:
                 # 简单日期比较保留 3 天
                 try:
-                    from datetime import datetime
-
                     dt_ev = datetime.strptime(ev_date, "%Y-%m-%d")
                     dt_now = datetime.strptime(today_str, "%Y-%m-%d")
                     if (dt_now - dt_ev).days <= 3:
@@ -233,8 +232,6 @@ class InboxMemory:
         添加或更新用户偏好规则。
         若已有相同 condition 则更新，否则追加。
         """
-        import uuid
-
         condition = (condition or "").strip()
         action_rule = (action_rule or "").strip()
         reason = (reason or "").strip()

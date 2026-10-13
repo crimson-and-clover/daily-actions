@@ -8,12 +8,11 @@ Inbox Agent (智能邮件助手) - Agentic ReAct 架构
      - 每次清空历史无包袱，重新注入 System Prompt 与【最新用户偏好规则库】
      - Agent 拥有完整工具箱，自主调用 move_emails, read_email_content, create_calendar_event, create_draft, save_user_preference 等
   4. 垃圾箱托管复核：
-     - 自动复核 Google 拦截的垃圾邮件，AI 研判误判时调用 rescue_from_spam 安全解救
+     - 以 10 封为一组循环复核 Google 拦截的垃圾邮件，AI 研判误判时调用 rescue_from_spam 安全解救
   5. 报告渲染与多渠道分发：
      - 汇总各批次成果，生成干练邮件简报并分发
 """
 
-import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -50,8 +49,8 @@ def get_run_slot_name(now_dt: datetime) -> str:
     return "夜间"
 
 
-def run_triage_pipeline():
-    """日常收件箱巡检与分流主工作流"""
+def main():
+    """日常收件箱巡检与分流主工作流 (适用于 GitHub Actions CI)"""
     validate_config(require_deepseek=True)
     now_dt = get_now_bjt()
     print(f"=== [Inbox Agent] 智能邮件助手启动 ({now_dt.strftime('%Y-%m-%d %H:%M:%S')} BJT) ===")
@@ -80,8 +79,9 @@ def run_triage_pipeline():
         raw_spam_emails = client.fetch_recent_spam_emails(days=FETCH_DAYS_LIMIT, max_count=30)
         print(f"[IMAP] 获取到垃圾箱近期待复核邮件: {len(raw_spam_emails)} 封")
     except Exception as e:
-        print(f"[IMAP Warning] 获取垃圾箱邮件异常: {e}", file=sys.stderr)
-        raw_spam_emails = []
+        print(f"[IMAP Fatal Error] 获取垃圾箱邮件异常: {e}", file=sys.stderr)
+        client.close()
+        sys.exit(1)
 
     # 1. 过滤已处理收件箱邮件
     unprocessed_emails = [e for e in raw_emails if not memory.is_processed(e.get("message_id"))]
@@ -113,30 +113,35 @@ def run_triage_pipeline():
         memory.save()
         print(f"  [批次进度已保存] 累计移动: 商业推广 {tracker.marketings_moved_count} | 系统通知 {tracker.systems_moved_count} | 垃圾箱 {tracker.spams_moved_count}")
 
-    # 3. 垃圾箱误杀复核托管：AI 自主研判并调用 rescue_from_spam 解救误杀邮件
+    # 3. 垃圾箱误杀复核托管：同样严格以 10 封为一组循环交由 Agent 复核并解救误杀
     unprocessed_spams = [e for e in raw_spam_emails if not memory.is_processed(e.get("message_id"))]
     if unprocessed_spams:
-        print(f"\n[垃圾箱复核] 正在交由 Agent 复核 {len(unprocessed_spams)} 封垃圾箱拦截邮件...")
-        tracker.register_batch_emails(unprocessed_spams)
+        total_unprocessed_spams = len(unprocessed_spams)
+        total_spam_batches = (total_unprocessed_spams + BATCH_SIZE - 1) // BATCH_SIZE
+        print(f"\n[垃圾箱复核] 开始分批复核 {total_unprocessed_spams} 封垃圾箱拦截邮件 (共 {total_spam_batches} 批)...")
 
-        # 构造复核上下文与提示词
-        spam_review_summary = engine.run_batch_triage(
-            batch_emails=unprocessed_spams[:20],
-            batch_num=1,
-            total_batches=1,
-            context=context,
-            user_email=GMAIL_USER,
-        )
-        print(f"  [垃圾箱复核结论]: {spam_review_summary}")
+        for s_idx in range(0, total_unprocessed_spams, BATCH_SIZE):
+            s_batch = unprocessed_spams[s_idx : s_idx + BATCH_SIZE]
+            s_batch_num = (s_idx // BATCH_SIZE) + 1
+            print(f"\n--- [垃圾箱复核批次 {s_batch_num}/{total_spam_batches}] 正在由 Agent 复核 {len(s_batch)} 封拦截邮件 ---")
 
-        # 将确认未解救的垃圾标记为 processed(is_spam=True)
-        for item in unprocessed_spams:
-            m_id = item.get("message_id")
-            uid = str(item.get("uid", ""))
-            is_rescued = any(r.get("uid") == uid for r in tracker.rescued_items)
-            if not is_rescued:
-                memory.mark_processed(m_id, is_spam=True)
-        memory.save()
+            s_summary = engine.run_batch_triage(
+                batch_emails=s_batch,
+                batch_num=s_batch_num,
+                total_batches=total_spam_batches,
+                context=context,
+                user_email=GMAIL_USER,
+            )
+            print(f"  [垃圾箱复核批次 {s_batch_num}/{total_spam_batches} 总结]: {s_summary}")
+
+            # 将本批确认未解救的垃圾标记为 processed(is_spam=True)
+            for item in s_batch:
+                m_id = item.get("message_id")
+                uid = str(item.get("uid", ""))
+                is_rescued = any(r.get("uid") == uid for r in tracker.rescued_items)
+                if not is_rescued:
+                    memory.mark_processed(m_id, is_spam=True)
+            memory.save()
 
     if client.imap:
         client.close()
@@ -150,13 +155,21 @@ def run_triage_pipeline():
     # 清理过期超过 3 天的历史日程
     memory.prune_expired_schedules(today_str=date_str)
 
+    # 汇总所有重要留存类别（包括普通重要、政务公函、银行证券、验证码）用于报告呈现
+    all_importants = (
+        tracker.importants
+        + tracker.government_affairs
+        + tracker.finance_bankings
+        + tracker.verification_codes
+    )
+
     # 5. 渲染邮件 HTML (严格只发邮件，不归档公开网页)
     email_html = render_email_report(
         date_str=now_dt.strftime("%Y-%m-%d %H:%M"),
         run_slot=run_slot,
         schedules=tracker.schedules,
         today_due_schedules=today_due_schedules,
-        importants=tracker.importants,
+        importants=all_importants,
         systems=tracker.systems,
         marketings=tracker.marketings,
         spams=tracker.spams,
@@ -171,7 +184,7 @@ def run_triage_pipeline():
     subject = (
         f"[Inbox Agent] {date_str} 收件箱简报[{run_slot}]: "
         f"{len(tracker.schedules)}项新增待办{due_today_tag} | "
-        f"{len(tracker.importants)}封重要 | "
+        f"{len(all_importants)}封重要 | "
         f"归档{tracker.systems_moved_count}封通知 | "
         f"隔离{tracker.marketings_moved_count}封营销 | "
         f"移入{tracker.spams_moved_count}封垃圾"
@@ -191,24 +204,6 @@ def run_triage_pipeline():
     finally:
         memory.save()
         print("=== [Inbox Agent] 状态已加密保存，执行完毕 ===")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Inbox Agent - 智能收件箱助手")
-    parser.add_argument(
-        "--chat",
-        "-c",
-        action="store_true",
-        help="启动多轮对话交互模式 (CLI Chat Mode)",
-    )
-    args = parser.parse_args()
-
-    if args.chat:
-        from inbox_agent.chat import start_chat
-
-        start_chat()
-    else:
-        run_triage_pipeline()
 
 
 if __name__ == "__main__":

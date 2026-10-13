@@ -166,6 +166,34 @@ class TestInboxAgentTools(unittest.TestCase):
         self.assertEqual(len(prefs), 1)
         self.assertEqual(prefs[0]["action_rule"], "自动归档至系统通知")
 
+    def test_new_categories_tracking(self):
+        self.tracker.register_batch_emails([
+            {"uid": "301", "subject": "您的验证码是 889201"},
+            {"uid": "302", "subject": "招商银行9月账单与证券结单"},
+            {"uid": "303", "subject": "北京市税务局纳税人通知公函"},
+        ])
+        execute_tool(
+            "mark_email_flags",
+            {"email_uids": ["301"], "category": "verification_code", "is_read": True, "tldr": "登录验证码"},
+            self.context,
+        )
+        execute_tool(
+            "mark_email_flags",
+            {"email_uids": ["302"], "category": "finance_banking", "is_starred": True, "tldr": "月度对账单"},
+            self.context,
+        )
+        execute_tool(
+            "mark_email_flags",
+            {"email_uids": ["303"], "category": "government_affairs", "is_starred": True, "tldr": "税务公函"},
+            self.context,
+        )
+        self.assertEqual(len(self.tracker.verification_codes), 1)
+        self.assertEqual(len(self.tracker.finance_bankings), 1)
+        self.assertEqual(len(self.tracker.government_affairs), 1)
+        self.assertEqual(self.tracker.triage_status["301"], "verification_code")
+        self.assertEqual(self.tracker.triage_status["302"], "finance_banking")
+        self.assertEqual(self.tracker.triage_status["303"], "government_affairs")
+
 
 class TestIMAPAndPrompts(unittest.TestCase):
     def test_mutf7_encode_decode(self):
