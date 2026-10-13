@@ -6,13 +6,15 @@ from unittest.mock import MagicMock
 from cryptography.fernet import Fernet
 
 from inbox_agent.engine import build_batch_user_prompt, build_system_prompt
-from inbox_agent.imap_client import mutf7_decode, mutf7_encode, parse_folder_name_from_list_line
+from inbox_agent.imap import mutf7_decode, mutf7_encode, parse_folder_name_from_list_line
 from inbox_agent.memory import InboxMemory
 from inbox_agent.tools import (
     AGENT_TOOLS,
     BatchTracker,
+    CategoryFolderSpec,
     ToolContext,
     execute_tool,
+    get_category_spec,
     resolve_folder_name,
 )
 
@@ -27,8 +29,23 @@ class TestInboxAgentMemory(unittest.TestCase):
         if self.temp_file.exists():
             self.temp_file.unlink()
 
+    def test_memory_version_and_upgrade(self):
+        mem = InboxMemory(filepath=self.temp_file, key=self.test_key)
+        self.assertEqual(mem.data.get("version"), 1)
+
+        # 模拟旧版无 version 数据的升级迁移
+        old_data = {
+            "processed_message_ids": ["msg_1"],
+            "total_processed": 1,
+        }
+        mem.data = old_data
+        mem.upgrade_schema()
+        self.assertEqual(mem.data["version"], 1)
+        self.assertIn("active_schedules", mem.data)
+        self.assertIn("user_preferences", mem.data)
+
     def test_preferences_lifecycle(self):
-        mem = InboxMemory(filepath=self.temp_file)
+        mem = InboxMemory(filepath=self.temp_file, key=self.test_key)
         self.assertEqual(len(mem.get_user_preferences()), 0)
 
         # 添加偏好
@@ -60,8 +77,57 @@ class TestInboxAgentMemory(unittest.TestCase):
         self.assertTrue(deleted)
         self.assertEqual(len(mem.get_user_preferences()), 0)
 
+    def test_calendar_schedules_lifecycle(self):
+        mem = InboxMemory(filepath=self.temp_file, key=self.test_key)
+        sched1 = {
+            "message_id": "msg_meeting_1",
+            "subject": "周一团队周会",
+            "event_date": "2026-10-20",
+            "event_time": "10:00",
+            "advance_days": 2,
+        }
+        sched2 = {
+            "message_id": "msg_meeting_2",
+            "subject": "产品发版评审",
+            "event_date": "2026-10-22",
+            "event_time": "15:00",
+            "advance_days": 1,
+        }
+        mem.add_schedule(sched1)
+        mem.add_schedule(sched2)
+        self.assertEqual(len(mem.get_active_schedules()), 2)
+
+        # 按标题移除日程
+        removed = mem.remove_schedule(subject="团队周会")
+        self.assertEqual(len(removed), 1)
+        self.assertEqual(removed[0]["message_id"], "msg_meeting_1")
+        self.assertEqual(len(mem.get_active_schedules()), 1)
+
+        # 按 message_id 移除日程
+        removed2 = mem.remove_schedule(message_id="msg_meeting_2")
+        self.assertEqual(len(removed2), 1)
+        self.assertEqual(len(mem.get_active_schedules()), 0)
+
+    def test_calendar_reschedule_updates_existing(self):
+        mem = InboxMemory(filepath=self.temp_file, key=self.test_key)
+        mem.add_schedule({
+            "message_id": "conf_100",
+            "subject": "开会",
+            "event_date": "2026-10-25",
+        })
+        # 改期覆盖更新
+        mem.add_schedule({
+            "message_id": "conf_100",
+            "subject": "开会 (已改期)",
+            "event_date": "2026-10-28",
+        })
+        schedules = mem.get_active_schedules()
+        self.assertEqual(len(schedules), 1)
+        self.assertEqual(schedules[0]["event_date"], "2026-10-28")
+        self.assertEqual(schedules[0]["subject"], "开会 (已改期)")
+
     def test_encryption_persistence(self):
-        mem = InboxMemory(filepath=self.temp_file)
+        mem = InboxMemory(filepath=self.temp_file, key=self.test_key)
         mem.mark_processed("test-msg-123", is_spam=False)
         mem.add_user_preference("发件人含 AWS", "归档至财务", "发票需求")
         mem.save()
@@ -69,7 +135,8 @@ class TestInboxAgentMemory(unittest.TestCase):
         self.assertTrue(self.temp_file.exists())
 
         # 读取新实例以验证解密载入
-        mem2 = InboxMemory(filepath=self.temp_file)
+        mem2 = InboxMemory(filepath=self.temp_file, key=self.test_key)
+        self.assertEqual(mem2.data.get("version"), 1)
         self.assertTrue(mem2.is_processed("test-msg-123"))
         prefs = mem2.get_user_preferences()
         self.assertEqual(len(prefs), 1)
@@ -91,7 +158,7 @@ class TestInboxAgentTools(unittest.TestCase):
         self.test_key = Fernet.generate_key().decode()
         self.temp_file = Path("tests/temp_test_tools_history.enc")
         os.environ["INBOX_STATE_KEY"] = self.test_key
-        self.memory = InboxMemory(filepath=self.temp_file)
+        self.memory = InboxMemory(filepath=self.temp_file, key=self.test_key)
 
         self.tracker = BatchTracker()
         self.context = ToolContext(client=self.client_mock, memory=self.memory, tracker=self.tracker)
@@ -106,8 +173,39 @@ class TestInboxAgentTools(unittest.TestCase):
         self.assertIn("move_emails", names)
         self.assertIn("read_email_content", names)
         self.assertIn("create_calendar_event", names)
+        self.assertIn("list_calendar_events", names)
+        self.assertIn("remove_calendar_event", names)
         self.assertIn("create_draft", names)
         self.assertIn("save_user_preference", names)
+        self.assertIn("remove_user_preference", names)
+
+    def test_category_triplet_specs(self):
+        spec_m = get_category_spec("marketing", self.client_mock)
+        self.assertIsInstance(spec_m, CategoryFolderSpec)
+        self.assertEqual(spec_m.category, "marketing")
+        self.assertEqual(spec_m.display_name, "商业推广")
+        self.assertEqual(spec_m.folder_id, "&V4NXPpCu-")
+
+        spec_v = get_category_spec("verification_code", self.client_mock)
+        self.assertEqual(spec_v.display_name, "验证码")
+        self.assertEqual(spec_v.folder_id, "INBOX")
+
+        spec_f = get_category_spec("finance_banking", self.client_mock)
+        self.assertEqual(spec_f.display_name, "银行与证券")
+        self.assertEqual(spec_f.folder_id, "INBOX")
+
+    def test_invalid_category_raises_error(self):
+        # Tracker 直接抛出异常
+        with self.assertRaises(ValueError):
+            self.tracker.mark_triaged("999", category="unknown_cat_xyz")
+
+        # execute_tool 传入非法类别直接抛出异常退出
+        with self.assertRaises(ValueError):
+            execute_tool(
+                "move_emails",
+                {"email_uids": ["999"], "category": "non_existent_category"},
+                self.context,
+            )
 
     def test_resolve_folder_name(self):
         self.assertEqual(resolve_folder_name(self.client_mock, "商业推广"), "&V4NXPpCu-")
@@ -124,12 +222,14 @@ class TestInboxAgentTools(unittest.TestCase):
         )
         self.assertEqual(res["status"], "success")
         self.assertEqual(res["moved_count"], 2)
+        self.assertEqual(res["display_name"], "商业推广")
         self.assertEqual(self.tracker.marketings_moved_count, 2)
         self.assertEqual(self.tracker.triage_status.get("101"), "marketing")
 
-    def test_create_calendar_event_tool(self):
+    def test_calendar_management_tools(self):
         self.tracker.register_batch_emails([{"uid": "201", "message_id": "msg_conf_1", "subject": "下周一季度规划会议"}])
-        res = execute_tool(
+        # 1. 创建日程
+        res_create = execute_tool(
             "create_calendar_event",
             {
                 "email_uid": "201",
@@ -141,10 +241,21 @@ class TestInboxAgentTools(unittest.TestCase):
             },
             self.context,
         )
-        self.assertEqual(res["status"], "success")
+        self.assertEqual(res_create["status"], "success")
         self.assertEqual(self.tracker.triage_status.get("201"), "schedule")
         self.assertEqual(len(self.tracker.schedules), 1)
-        self.assertEqual(len(self.memory.data.get("active_schedules", [])), 1)
+        self.assertEqual(len(self.memory.get_active_schedules()), 1)
+
+        # 2. 列出日程
+        res_list = execute_tool("list_calendar_events", {"keyword": "规划会议"}, self.context)
+        self.assertEqual(res_list["status"], "success")
+        self.assertEqual(res_list["total"], 1)
+
+        # 3. 移除日程
+        res_remove = execute_tool("remove_calendar_event", {"title": "规划会议"}, self.context)
+        self.assertEqual(res_remove["status"], "success")
+        self.assertEqual(res_remove["removed_count"], 1)
+        self.assertEqual(len(self.memory.get_active_schedules()), 0)
 
     def test_create_draft_tool(self):
         res = execute_tool(
@@ -166,6 +277,13 @@ class TestInboxAgentTools(unittest.TestCase):
         self.assertEqual(len(prefs), 1)
         self.assertEqual(prefs[0]["action_rule"], "自动归档至系统通知")
 
+    def test_remove_user_preference_tool(self):
+        p = self.memory.add_user_preference("发件人含 @example.com", "标星")
+        pref_id = p["id"]
+        res = execute_tool("remove_user_preference", {"preference_id": pref_id}, self.context)
+        self.assertEqual(res["status"], "success")
+        self.assertEqual(len(self.memory.get_user_preferences()), 0)
+
     def test_new_categories_tracking(self):
         self.tracker.register_batch_emails([
             {"uid": "301", "subject": "您的验证码是 889201"},
@@ -173,8 +291,8 @@ class TestInboxAgentTools(unittest.TestCase):
             {"uid": "303", "subject": "北京市税务局纳税人通知公函"},
         ])
         execute_tool(
-            "mark_email_flags",
-            {"email_uids": ["301"], "category": "verification_code", "is_read": True, "tldr": "登录验证码"},
+            "move_emails",
+            {"email_uids": ["301"], "category": "verification_code", "tldr": "登录验证码"},
             self.context,
         )
         execute_tool(
@@ -208,12 +326,19 @@ class TestIMAPAndPrompts(unittest.TestCase):
         self.assertIn(r"\Spam", flags)
         self.assertEqual(name, "[Gmail]/&V4NXPpCu-")
 
+        # 测试未加引号的 INBOX
+        sample_inbox = r'(\HasNoChildren) "/" INBOX'
+        flags_inbox, name_inbox = parse_folder_name_from_list_line(sample_inbox)
+        self.assertEqual(name_inbox, "INBOX")
+
     def test_prompts_generation(self):
         sys_p = build_system_prompt("my@example.com", "1. 规则A => 动作B")
         self.assertIn("my@example.com", sys_p)
         self.assertIn("规则A => 动作B", sys_p)
 
-        user_p = build_batch_user_prompt([{"uid": "99", "from": "test@test.com", "subject": "测试邮件", "snippet": "这是一段测试摘要"}], 1, 1)
+        user_p = build_batch_user_prompt(
+            [{"uid": "99", "from": "test@test.com", "subject": "测试邮件", "snippet": "这是一段测试摘要"}], 1, 1
+        )
         self.assertIn("[UID: 99]", user_p)
         self.assertIn("这是一段测试摘要", user_p)
 

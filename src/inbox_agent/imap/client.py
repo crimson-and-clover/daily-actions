@@ -8,7 +8,6 @@ import imaplib
 import sys
 import time
 from datetime import timedelta
-from email.header import Header
 from email.message import EmailMessage
 
 from inbox_agent.config import FETCH_DAYS_LIMIT, MAX_EMAILS_PER_RUN, PRUNE_DAYS, get_now_bjt
@@ -365,11 +364,11 @@ class GmailClient:
                 for f in folder_list:
                     flags, name = parse_folder_name_from_list_line(f)
                     flags_lower = flags.lower()
-                    name_lower = name.lower()
+                    decoded_lower = mutf7_decode(name).lower()
                     if r"\spam" in flags_lower or r"\junk" in flags_lower:
                         self._spam_folder = name
                         return name
-                    if "spam" in name_lower or "垃圾" in name or "&v4nxp" in name_lower:
+                    if "spam" in decoded_lower or "垃圾" in decoded_lower:
                         self._spam_folder = name
                         return name
         except Exception as e:
@@ -389,15 +388,16 @@ class GmailClient:
                 for f in folder_list:
                     flags, name = parse_folder_name_from_list_line(f)
                     flags_lower = flags.lower()
-                    name_lower = name.lower()
+                    decoded_lower = mutf7_decode(name).lower()
                     if r"\trash" in flags_lower:
                         self._trash_folder = name
                         return name
                     if (
-                        "trash" in name_lower
-                        or "已删除" in name
-                        or "废件" in name
-                        or "&v4nxpq-" in name_lower
+                        "trash" in decoded_lower
+                        or "已删除" in decoded_lower
+                        or "废件" in decoded_lower
+                        or "回收站" in decoded_lower
+                        or "废纸篓" in decoded_lower
                     ):
                         self._trash_folder = name
                         return name
@@ -418,11 +418,11 @@ class GmailClient:
                 for f in folder_list:
                     flags, name = parse_folder_name_from_list_line(f)
                     flags_lower = flags.lower()
-                    name_lower = name.lower()
+                    decoded_lower = mutf7_decode(name).lower()
                     if r"\drafts" in flags_lower:
                         self._drafts_folder = name
                         return name
-                    if "draft" in name_lower or "草稿" in name or "&g0l6pw-" in name_lower:
+                    if "draft" in decoded_lower or "草稿" in decoded_lower:
                         self._drafts_folder = name
                         return name
         except Exception as e:
@@ -430,30 +430,29 @@ class GmailClient:
         self._drafts_folder = "[Gmail]/Drafts"
         return self._drafts_folder
 
-    def archive_emails(self, email_uids: list[str], folder_name: str = "Archive") -> int:
-        """将邮件安全移出 INBOX 归档至目标分类文件夹"""
+    def _move_uids(self, email_uids: list[str], dest_folder: str, source_folder: str = "INBOX") -> int:
+        """通用底层邮件移动：将指定 UID 列表从 source_folder 转移至 dest_folder"""
         if not email_uids or not self.ensure_connected():
             return 0
 
-        target_folder = self._ensure_folder(folder_name)
         try:
-            self.imap.select("INBOX")
+            self.imap.select(source_folder)
         except Exception:
             self.ensure_connected()
-            self.imap.select("INBOX")
+            self.imap.select(source_folder)
 
         moved_count = 0
         for uid in email_uids:
             try:
-                res, _ = self.imap.uid("COPY", uid, target_folder)
+                res, _ = self.imap.uid("COPY", uid, dest_folder)
                 if res == "OK":
                     self.imap.uid("STORE", uid, "+FLAGS", "(\\Deleted)")
                     moved_count += 1
             except Exception as e:
-                print(f"[IMAP Warning] 归档移动失败 ({uid}): {e}")
+                print(f"[IMAP Warning] 邮件转移失败 ({uid} -> {dest_folder}): {e}")
                 try:
                     self.ensure_connected()
-                    self.imap.select("INBOX")
+                    self.imap.select(source_folder)
                 except Exception:
                     pass
 
@@ -463,6 +462,11 @@ class GmailClient:
             pass
 
         return moved_count
+
+    def archive_emails(self, email_uids: list[str], folder_name: str = "Archive") -> int:
+        """将邮件安全移出 INBOX 归档至目标分类文件夹"""
+        target_folder = self._ensure_folder(folder_name)
+        return self._move_uids(email_uids, target_folder, source_folder="INBOX")
 
     def fetch_recent_spam_emails(
         self, days: int = FETCH_DAYS_LIMIT, max_count: int = 30
@@ -543,105 +547,17 @@ class GmailClient:
         dest_folder = (
             self._ensure_folder(target_folder) if target_folder != "INBOX" else "INBOX"
         )
-
-        try:
-            st, _ = self.imap.select(spam_folder)
-            if st != "OK":
-                return False
-            res, _ = self.imap.uid("COPY", email_uid, dest_folder)
-            if res == "OK":
-                self.imap.uid("STORE", email_uid, "+FLAGS", "(\\Deleted)")
-                self.imap.expunge()
-                return True
-        except Exception as e:
-            print(f"[IMAP Warning] 误杀解救移动失败 ({email_uid}): {e}")
-        return False
+        return self._move_uids([email_uid], dest_folder, source_folder=spam_folder) > 0
 
     def move_to_spam(self, email_uids: list[str]) -> int:
         """移入垃圾箱"""
-        if not email_uids or not self.ensure_connected():
-            return 0
-
         dest_folder = self.get_spam_folder_name()
-        try:
-            self.imap.select("INBOX")
-        except Exception:
-            self.ensure_connected()
-            self.imap.select("INBOX")
-
-        moved_count = 0
-        for uid in email_uids:
-            try:
-                res, _ = self.imap.uid("COPY", uid, dest_folder)
-                if res == "OK":
-                    self.imap.uid("STORE", uid, "+FLAGS", "(\\Deleted)")
-                    moved_count += 1
-            except Exception as e:
-                print(f"[IMAP Warning] 移入垃圾邮件失败 ({uid}): {e}")
-                try:
-                    self.ensure_connected()
-                    self.imap.select("INBOX")
-                except Exception:
-                    pass
-
-        try:
-            self.imap.expunge()
-        except Exception:
-            pass
-
-        return moved_count
+        return self._move_uids(email_uids, dest_folder, source_folder="INBOX")
 
     def move_to_trash(self, email_uids: list[str]) -> int:
         """移入废纸篓/回收站"""
-        if not email_uids or not self.ensure_connected():
-            return 0
-
         dest_folder = self.get_trash_folder_name()
-        try:
-            self.imap.select("INBOX")
-        except Exception:
-            self.ensure_connected()
-            self.imap.select("INBOX")
-
-        moved_count = 0
-        for uid in email_uids:
-            try:
-                res, _ = self.imap.uid("COPY", uid, dest_folder)
-                if res == "OK":
-                    self.imap.uid("STORE", uid, "+FLAGS", "(\\Deleted)")
-                    moved_count += 1
-            except Exception as e:
-                print(f"[IMAP Warning] 移入回收站失败 ({uid}): {e}")
-                try:
-                    self.ensure_connected()
-                    self.imap.select("INBOX")
-                except Exception:
-                    pass
-
-        try:
-            self.imap.expunge()
-        except Exception:
-            pass
-
-        return moved_count
-
-    def prune_old_low_value_emails(self, days: int = PRUNE_DAYS) -> int:
-        """清理 90 天以上低价值邮件"""
-        if not self.imap:
-            return 0
-
-        st, _ = self.imap.select("INBOX")
-        if st != "OK":
-            return 0
-
-        before_date = (get_now_bjt() - timedelta(days=days)).strftime("%d-%b-%Y")
-        st, data = self.imap.search(None, f'(BEFORE "{before_date}")')
-        if st != "OK" or not data or not data[0]:
-            return 0
-
-        old_ids = data[0].split()
-        old_uids = [oid.decode() for oid in old_ids[:50]]
-        return self.move_to_trash(old_uids)
+        return self._move_uids(email_uids, dest_folder, source_folder="INBOX")
 
     def create_draft(
         self, to: list[str] | str, subject: str, body: str, in_reply_to: str = ""
@@ -654,7 +570,7 @@ class GmailClient:
         msg = EmailMessage()
         msg["From"] = self.username
         msg["To"] = ", ".join(to) if isinstance(to, list) else str(to)
-        msg["Subject"] = Header(subject, "utf-8").encode()
+        msg["Subject"] = subject
         if in_reply_to:
             msg["In-Reply-To"] = in_reply_to
             msg["References"] = in_reply_to
@@ -700,16 +616,20 @@ class GmailClient:
             if sender:
                 criteria.extend(["FROM", f'"{sender}"'])
 
-            search_str = " ".join(criteria) if criteria else "ALL"
             if query:
+                search_terms = list(criteria)
+                search_terms.append(f'X-GM-RAW "{query}"')
                 try:
-                    res, data = self.imap.uid("SEARCH", None, f'X-GM-RAW "{query}"')
+                    res, data = self.imap.uid("SEARCH", None, *search_terms)
                     if res != "OK" or not data or not data[0]:
-                        res, data = self.imap.uid("SEARCH", None, f'(TEXT "{query}")')
+                        fallback_terms = list(criteria) + ["TEXT", f'"{query}"']
+                        res, data = self.imap.uid("SEARCH", None, *fallback_terms)
                 except Exception:
-                    res, data = self.imap.uid("SEARCH", None, f'(TEXT "{query}")')
+                    fallback_terms = list(criteria) + ["TEXT", f'"{query}"']
+                    res, data = self.imap.uid("SEARCH", None, *fallback_terms)
             else:
-                res, data = self.imap.uid("SEARCH", None, search_str)
+                search_terms = list(criteria) if criteria else ["ALL"]
+                res, data = self.imap.uid("SEARCH", None, *search_terms)
 
             if res != "OK" or not data or not data[0]:
                 return []
@@ -863,24 +783,3 @@ class GmailClient:
             }
         except Exception as e:
             return {"status": "error", "message": f"标记邮件失败: {e}"}
-
-    def list_folders(self) -> list[dict]:
-        """获取所有可用文件夹列表及其解码名称"""
-        if not self.ensure_connected():
-            return []
-        try:
-            status, folder_list = self.imap.list()
-            if status != "OK" or not folder_list:
-                return []
-            results = []
-            for f in folder_list:
-                flags, name = parse_folder_name_from_list_line(f)
-                results.append({
-                    "raw_name": name,
-                    "display_name": mutf7_decode(name),
-                    "flags": flags,
-                })
-            return results
-        except Exception as e:
-            print(f"[IMAP Warning] 列出文件夹失败: {e}")
-            return []

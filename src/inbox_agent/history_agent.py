@@ -26,7 +26,7 @@ from inbox_agent.config import (
     get_now_bjt,
     validate_config,
 )
-from inbox_agent.imap_client import GmailClient
+from inbox_agent.imap import GmailClient
 from inbox_agent.memory import InboxMemory
 from inbox_agent.renderer import render_history_email_report
 from utils.mailer import send_email_html

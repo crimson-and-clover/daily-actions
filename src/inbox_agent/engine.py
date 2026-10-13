@@ -180,15 +180,14 @@ class AgentEngine:
                     "content": json.dumps(tool_result, ensure_ascii=False),
                 })
 
-        # 兜底保障：检查本批次中是否有被 Agent 遗漏的邮件
+        # 仅对已被 Agent 明确调用工具研判处置的邮件标记已处理，遗漏邮件不 mark 也不设定默认分类
         for e in batch_emails:
             uid = str(e.get("uid", ""))
             m_id = e.get("message_id", "")
             cat = tracker.triage_status.get(uid)
-            if not cat:
-                # 遗漏的邮件默认安全留在 INBOX，归入 important
-                tracker.mark_triaged(uid, category="important", tldr=e.get("subject", "留存待办"))
-                cat = "important"
-            memory.mark_processed(m_id, is_spam=(cat == "spam"))
+            if cat:
+                memory.mark_processed(m_id, is_spam=(cat == "spam"))
+            else:
+                print(f"  [Notice] 邮件 UID {uid} (Subject: {e.get('subject')}) 未被 Agent 研判处置，保留在 INBOX 且不标记为已处理。")
 
         return final_summary or "本批次邮件处置完成。"

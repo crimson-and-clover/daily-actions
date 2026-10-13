@@ -1,16 +1,6 @@
 """
-Inbox Agent (智能邮件助手) - Agentic ReAct 架构
-- 运行机制：
-  1. 状态持久化 (InboxMemory)：AES 加密保存已分类邮件 ID、日程待办与用户偏好规则
-  2. 邮箱交互 (GmailClient)：安全连接 IMAP 抓取收件箱与垃圾箱待处理邮件
-  3. 批次化决策驱动 (Batch ReAct)：
-     - 严格以 10 封为一组 (BATCH_SIZE = 10) 开启全新独立会话上下文
-     - 每次清空历史无包袱，重新注入 System Prompt 与【最新用户偏好规则库】
-     - Agent 拥有完整工具箱，自主调用 move_emails, read_email_content, create_calendar_event, create_draft, save_user_preference 等
-  4. 垃圾箱托管复核：
-     - 以 10 封为一组循环复核 Google 拦截的垃圾邮件，AI 研判误判时调用 rescue_from_spam 安全解救
-  5. 报告渲染与多渠道分发：
-     - 汇总各批次成果，生成干练邮件简报并分发
+Inbox Agent (智能邮件助手)
+基于 ReAct 驱动的自动化邮件分类、日程提取与简报分发工具。
 """
 
 import sys
@@ -30,7 +20,7 @@ from inbox_agent.config import (
     validate_config,
 )
 from inbox_agent.engine import AgentEngine
-from inbox_agent.imap_client import GmailClient
+from inbox_agent.imap import GmailClient
 from inbox_agent.memory import InboxMemory
 from inbox_agent.renderer import render_email_report
 from inbox_agent.tools import BatchTracker, ToolContext
@@ -120,6 +110,7 @@ def main():
         total_spam_batches = (total_unprocessed_spams + BATCH_SIZE - 1) // BATCH_SIZE
         print(f"\n[垃圾箱复核] 开始分批复核 {total_unprocessed_spams} 封垃圾箱拦截邮件 (共 {total_spam_batches} 批)...")
 
+        context.current_folder = client.get_spam_folder_name()
         for s_idx in range(0, total_unprocessed_spams, BATCH_SIZE):
             s_batch = unprocessed_spams[s_idx : s_idx + BATCH_SIZE]
             s_batch_num = (s_idx // BATCH_SIZE) + 1
@@ -139,7 +130,7 @@ def main():
                 m_id = item.get("message_id")
                 uid = str(item.get("uid", ""))
                 is_rescued = any(r.get("uid") == uid for r in tracker.rescued_items)
-                if not is_rescued:
+                if not is_rescued and not memory.is_processed(m_id):
                     memory.mark_processed(m_id, is_spam=True)
             memory.save()
 

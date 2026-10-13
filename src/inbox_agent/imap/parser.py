@@ -28,7 +28,7 @@ def decode_str(header_val: str) -> str:
 def parse_folder_name_from_list_line(line: bytes | str) -> tuple[str, str]:
     """
     解析 imap.list() 返回的单行，提取 flags 和 folder_name。
-    RFC 3501 LIST 格式形如: (\\HasNoChildren \\Spam) "/" "[Gmail]/&V4NXPpCu-"
+    RFC 3501 LIST 格式形如: (\\HasNoChildren \\Spam) "/" "[Gmail]/&V4NXPpCu-" 或 (\\HasNoChildren) "/" INBOX
     返回: (flags_str, folder_name)
     """
     if isinstance(line, bytes):
@@ -37,15 +37,17 @@ def parse_folder_name_from_list_line(line: bytes | str) -> tuple[str, str]:
         raw_str = str(line)
 
     flags = ""
-    flags_match = re.search(r"\(([^)]*)\)", raw_str)
+    rest = raw_str.strip()
+    flags_match = re.search(r"\(([^)]*)\)\s+(.*)$", rest)
     if flags_match:
         flags = flags_match.group(1)
+        rest = flags_match.group(2).strip()
 
-    quoted_matches = re.findall(r'"([^"]+)"', raw_str)
-    if quoted_matches:
-        folder_name = quoted_matches[-1]
+    mailbox_match = re.search(r'(?:"([^"]+)"|(\S+))\s*$', rest)
+    if mailbox_match:
+        folder_name = mailbox_match.group(1) if mailbox_match.group(1) is not None else (mailbox_match.group(2) or "")
     else:
-        folder_name = raw_str.strip().split()[-1]
+        folder_name = rest.split()[-1] if rest else ""
 
     return flags, folder_name
 
