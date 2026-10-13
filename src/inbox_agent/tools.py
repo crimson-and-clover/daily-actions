@@ -6,7 +6,7 @@ Inbox Agent 工具系统 (Tools Definition & Modular Dispatcher)
 from dataclasses import dataclass, field
 from typing import Any
 
-from inbox_agent.imap_client import GmailClient, mutf7_decode
+from inbox_agent.imap_client import GmailClient
 from inbox_agent.memory import InboxMemory
 
 
@@ -442,7 +442,7 @@ def _handle_move_emails(arguments: dict[str, Any], context: ToolContext) -> dict
             category = category or "spam"
         else:
             moved_count = client.archive_emails(uids, folder_name=resolved_dest)
-            if "商业推广" in mutf7_decode(resolved_dest) or category == "marketing":
+            if "商业推广" in resolved_dest or category == "marketing":
                 category = category or "marketing"
                 tracker.marketings_moved_count += moved_count
             else:
@@ -457,7 +457,7 @@ def _handle_move_emails(arguments: dict[str, Any], context: ToolContext) -> dict
     return {
         "status": "success",
         "moved_count": moved_count,
-        "target_folder": mutf7_decode(resolved_dest),
+        "target_folder": resolved_dest,
         "uids": uids,
     }
 
@@ -622,11 +622,11 @@ def _handle_rescue_from_spam(arguments: dict[str, Any], context: ToolContext) ->
         "from": cached.get("from", ""),
         "category": cat,
         "reason": reason,
-        "destination": mutf7_decode(resolved),
+        "destination": resolved,
     })
     return {
         "status": "success",
-        "message": f"邮件 UID {uid} 已从 Spam 解救至 {mutf7_decode(resolved)}",
+        "message": f"邮件 UID {uid} 已从 Spam 解救至 {resolved}",
     }
 
 
