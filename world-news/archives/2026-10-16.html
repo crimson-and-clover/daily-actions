@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全球宏观、市场与计算开源内参</title>
+    <style>
+        /* 移动端与桌面端自适应、彻底告别挤压折叠 */
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f1f3f5;
+            margin: 0;
+            padding: 12px 6px;
+            color: #1a202c;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #d2d6dc;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        /* 刊头：流式上下堆叠，绝不左右横向硬挤 */
+        .masthead {
+            padding: 20px 18px 14px 18px;
+            border-bottom: 2px solid #0f172a;
+            background: #ffffff;
+        }
+        .masthead-meta-top {
+            font-size: 11px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .masthead h1 {
+            margin: 4px 0 6px 0;
+            font-size: 21px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            line-height: 1.3;
+        }
+        .masthead-date {
+            font-size: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .masthead-sub {
+            margin: 0;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        /* 态势关键信号横条：采用竖向流式清单，杜绝横向窄列挤压 */
+        .signals-box {
+            padding: 12px 18px;
+            background-color: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .signals-title {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .signals-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .signals-list li {
+            position: relative;
+            padding-left: 14px;
+            font-size: 12.5px;
+            color: #334155;
+            line-height: 1.5;
+            margin-bottom: 6px;
+        }
+        .signals-list li:last-child {
+            margin-bottom: 0;
+        }
+        .signals-list li::before {
+            content: "▪";
+            position: absolute;
+            left: 0;
+            color: #2563eb;
+            font-size: 13px;
+        }
+
+        .content {
+            padding: 18px 16px;
+        }
+
+        /* 宏观态势综述 */
+        .summary-block {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #0f172a;
+            padding: 14px 16px;
+            margin-bottom: 24px;
+            border-radius: 0 4px 4px 0;
+        }
+        .summary-label {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+        .summary-body {
+            font-size: 13.5px;
+            color: #1e293b;
+            line-height: 1.65;
+            text-align: justify;
+        }
+
+        /* 板块分割栏 */
+        .section {
+            margin-bottom: 26px;
+        }
+        .section-header {
+            border-bottom: 1.5px solid #0f172a;
+            padding-bottom: 6px;
+            margin-bottom: 14px;
+        }
+        .section-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            display: inline-block;
+        }
+        .section-code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+            display: inline-block;
+            margin-left: 6px;
+        }
+
+        /* 条目卡片 */
+        .item-card {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            padding: 14px 14px 12px 14px;
+            margin-bottom: 16px;
+            border-radius: 4px;
+        }
+
+        /* 卡片头部：分层解耦，不再横向打架 */
+        .item-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .badge-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .item-tag {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #1d4ed8;
+            background-color: #eff6ff;
+            border: 1px solid #dbeafe;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .source-tag {
+            font-size: 10.5px;
+            color: #475569;
+            background-color: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        .score-pill-overall {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 2px;
+            background-color: #0f172a;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        /* 细分多维指标条：单起一行，清晰明了 */
+        .sub-metrics-row {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 10.5px;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed #f1f5f9;
+        }
+        .sub-metrics-row span {
+            color: #1e293b;
+        }
+
+        .item-title {
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.45;
+            color: #0f172a;
+            margin: 0 0 10px 0;
+        }
+        .item-title a {
+            color: #0f172a;
+            text-decoration: none;
+        }
+        .item-title a:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+
+        /* 段落式正文：流式撑满全宽，彻底消除 86px 逼仄分栏 */
+        .data-content {
+            font-size: 13px;
+            color: #1f2937;
+            line-height: 1.6;
+        }
+        .data-para {
+            margin-bottom: 8px;
+            text-align: justify;
+        }
+        .data-para:last-child {
+            margin-bottom: 0;
+        }
+        .para-label {
+            font-weight: 700;
+            color: #475569;
+            font-size: 12px;
+            display: inline;
+            margin-right: 4px;
+        }
+        .para-rationale {
+            font-size: 12px;
+            color: #64748b;
+            font-style: italic;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* 市场资产传导专属研判框：自适应流式排版 */
+        .market-box {
+            margin-top: 10px;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 3px solid #2563eb;
+            padding: 9px 12px;
+            font-size: 12.5px;
+            border-radius: 0 3px 3px 0;
+        }
+        .market-header {
+            font-weight: 700;
+            color: #1e40af;
+            font-size: 11px;
+            margin-bottom: 4px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .assets-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            padding: 1px 5px;
+            border-radius: 2px;
+            font-size: 11px;
+            margin-left: 4px;
+            font-weight: 600;
+        }
+        .market-logic {
+            color: #0f172a;
+            line-height: 1.55;
+            text-align: justify;
+            margin-top: 4px;
+        }
+
+        /* 元信息脚标栏 */
+        .item-footer {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px dashed #e2e8f0;
+            font-size: 11px;
+            color: #94a3b8;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .item-footer a {
+            color: #64748b;
+            text-decoration: none;
+        }
+        .item-footer a:hover {
+            text-decoration: underline;
+        }
+        .stat-badge {
+            color: #334155;
+            font-weight: 600;
+        }
+
+        /* 脚注 */
+        .footer {
+            padding: 16px 18px;
+            font-size: 11px;
+            color: #64748b;
+            background: #fafafa;
+            border-top: 1px solid #e5e7eb;
+            line-height: 1.55;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="padding: 12px 18px 0 18px; font-size: 12px; color: #64748b; background: #ffffff;">
+            <a href="../index.html" style="color: #2563eb; text-decoration: none; font-weight: 500;">&larr; 返回资讯专区目录</a>
+            <span style="margin: 0 8px; color: #cbd5e1;">|</span>
+            <a href="../../index.html" style="color: #64748b; text-decoration: none;">知识门户总览</a>
+        </div>
+        <!-- 刊头 -->
+        <div class="masthead">
+            <div class="masthead-meta-top">GLOBAL INTELLIGENCE & TECHNOLOGY BRIEFING</div>
+            <h1>全球宏观、市场与计算开源内参</h1>
+            <div class="masthead-date">2026年10月16日 (北京时间)</div>
+            <p class="masthead-sub">
+                多源聚合 • 多维度量化评级 (Overall &ge; 7.0) • 资本市场与产业传导研判
+            </p>
+        </div>
+
+        <!-- 态势关键信号栏：纵向流式清单，彻底解决横向挤压 -->
+        <div class="signals-box">
+            <div class="signals-title">KEY SIGNALS / 核心态势信号</div>
+            <ul class="signals-list">
+                <li>能源与关键矿产同步武器化：俄乌炼油厂互袭叠加中国稀土定向放行欧盟，供给端地缘溢价与阵营化定价权重回主导</li>
+                <li>AI信用链条首次成为高利率的显性压力点：CoreWeave债务融资模式遭重估，杠杆资金从算力叙事撤向美债与黄金</li>
+                <li>金融体系内部杠杆累积：避税型交易推高保证金贷款至约1900亿美元，放大回撤时的强平与波动外溢</li>
+                <li>安全基建从可选转为必选：零点击广告间谍软件与RPKI覆盖跃升70%，共同确认路由与分发层为下一代核心攻防面</li>
+            </ul>
+        </div>
+
+        <div class="content">
+
+            <!-- 宏观态势综述 -->
+            <div class="summary-block">
+                <div class="summary-label">EXECUTIVE SUMMARY / 宏观态势与市场综述</div>
+                <div class="summary-body">俄乌能源互袭重启、稀土定向供应欧盟，能源与关键矿产加速武器化，供应链阵营化溢价抬升。高利率侵蚀AI算力融资链，CoreWeave抛售暴露杠杆脆弱，资金转向美债与黄金避险。技术端，广告链被武器化为零点击间谍软件，RPKI覆盖升至70%，安全基建成硬约束，开源模型持续压低商业工具链定价权。</div>
+            </div>
+
+            <!-- 第一板块：宏观地缘与金融资本市场 -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">宏观地缘与全球金融市场</span>
+                    <span class="section-code">[SEC-01 / MACRO & FINANCIAL]</span>
+                </div>
+
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">大宗能源/地缘安全</span>
+                                <span class="source-tag">WSJ World</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.9 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>9.2</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>8.8</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.5</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/world/ukraine-strikes-russian-refinery-after-moscow-breaks-trumps-energy-ceasefire-35b3ee40?mod=rss_worldnews" target="_blank">乌克兰袭击俄罗斯炼油厂，莫斯科能源停火破裂 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：俄乌能源设施互袭升级，扰动原油供给与东欧地缘风险溢价</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>乌方在俄方恢复对乌能源设施打击后宣布不再遵守能源设施停火默契，随即以中程无人机与远程火力袭击俄境内炼油与油储设施；相关限制放宽后乌方恢复中程打击能力，俄方指认乌方袭击炼油厂并威胁对等报复。事件主体为乌军总参谋部与俄国防部，涉及炼油产能、成品油出口节奏与黑海航运安全。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>乌克兰诉求为削弱俄炼油与出口创汇、抬高其战争成本；俄罗斯诉求为维持炼油产能与成品油出口稳定、避免国内油价与通胀失控；美国与欧盟在限制放宽与升级风险间权衡，既希望压制俄能源收入又忌惮油价飙升；印度、土耳其等俄油买家关注折价与合规风险；OPEC+关注是否需提前调整减产节奏以对冲供给扰动。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>冲突从战线消耗延伸至能源基础设施互毁，推动原油与成品油贸易流进一步区域化与合规化分层；俄炼油开工率下滑将同时抬升其国内汽柴油价格并压低原油出口的成品油附加值，迫使俄以更大幅度折价出口原油，强化亚洲买家议价能力；欧洲柴油与航空煤油进口替代压力上升，全球炼能紧张格局被再度确认。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">布伦特与WTI原油期货、欧洲柴油裂解价差、俄罗斯Urals原油贴水、欧洲TTF天然气、油运运价与欧洲国防军工股</span>
+                            </div>
+                            <div class="market-logic">袭击直接削减俄炼油开工与成品油出口，短期利好原油及柴油裂解价差，并推升油运绕行与保险费率；供给风险溢价回归使原油期限结构趋于走陡，抬升远期通胀预期，间接压制久期资产估值；若俄以打击乌电网与港口反制，欧洲天然气与电力价格波动率将同步放大，资金流向能源多头与通胀保值资产，风险偏好阶段性承压。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Ukraine Strikes Russian Refinery After Moscow Brea...</span>
+                            <span>Thu, 15 Oct 2026 17:09:00 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">货币政策/主权货币</span>
+                                <span class="source-tag">Bloomberg Markets</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.8 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>9.0</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>8.2</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>9.2</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.bloomberg.com/news/articles/2026-10-15/china-s-plan-to-make-yuan-a-global-currency-enters-faster-phase" target="_blank">中国推动人民币国际化进入加速阶段 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：人民币国际化提速冲击美元储备体系，影响跨境资本与汇率格局</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>中国货币当局推进跨境支付清算网络扩容、双边本币互换协议续签、离岸人民币产品与债券市场开放，并以大宗商品人民币计价结算、数字人民币跨境试点为配套抓手；相关举措从贸易结算延伸至投融资与储备职能，形成本币使用闭环建设。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>中国诉求为降低对美元清算体系的路径依赖、提升本币计价与融资话语权；美国关注美元储备份额与制裁工具效力被稀释；新兴市场与产油国在结算便利、汇率风险与合规压力间权衡；境外机构投资者关注资本账户开放节奏与对冲工具可得性；离岸市场做市与托管机构寻求流动性配套。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>人民币结算与计价份额抬升将逐步削弱美元在大宗商品与贸易融资中的独占地位，推动全球储备与结算体系向多极化演进；跨境清算网络扩张降低单一渠道被切断的尾部风险，增强受制裁经济体的替代选项；中长期看，全球美元流动性分布与离岸美元融资成本曲线将被重塑，区域货币合作与双边本币互换成为常态工具。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">离岸人民币CNH汇率、美元指数DXY、中国国债与政策性金融债、跨境支付与清算主题股、大宗商品人民币计价合约</span>
+                            </div>
+                            <div class="market-logic">结算与储备需求增量利好CNH及人民币债券配置价值，推动外资持有中国债券规模与久期需求上行，压缩中美利差对汇率的单向压制；美元指数因边际结算需求分流而承压，但幅度取决于储备资产替代速度；若配套对冲工具与资本账户开放同步，人民币资产风险溢价下行；反之若推进节奏与市场预期错位，将放大CNH波动率与跨境资金双向波动。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: China’s Plan to Make Yuan a Global Currency Enters...</span>
+                            <span>Thu, 15 Oct 2026 23:00:00 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">关键矿产/供应链</span>
+                                <span class="source-tag">CNBC Markets</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.4 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>8.7</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>7.8</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.9</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.cnbc.com/2026/10/15/china-rare-earth-exports-europe.html" target="_blank">中国示意稀土将继续供应欧盟，不受美国贸易协议到期影响 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：稀土供应定向欧盟，强化关键矿产武器化与产业链阵营分化</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>欧盟贸易委员与中国商务部长在北京会晤后，中方示意对欧盟的稀土及相关磁材供应将继续保持通道，条件与美方贸易安排到期与否无直接绑定；此前稀土出口管制许可与用途审查机制已落地，形成差异化放行的管理框架。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>中国诉求为以差异化供应维持对欧经贸关系并提升谈判筹码；欧盟诉求为保障新能源、汽车与国防供应链的稀土可得性，同时推进关键原材料法案与多元化采购；美国关注管制是否针对其自身产业形成非对称限制；欧洲车企、风电与防务承包商关注许可周期与库存安全；澳、加拿大等替代矿源方寻求加速产能与承购协议。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>关键矿产从市场化商品转为政策化工具，供应许可的差异化放行使欧盟与美国在供应链安全上出现路径分叉，加速全球磁材与稀土冶炼产能的区域化布点；欧盟本土分离冶炼与回收项目获得政策与资本倾斜，但短期仍依赖中国加工环节；中长期看，稀土定价将更多体现政策溢价而非纯边际成本，下游电驱与风电成本曲线抬升。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">稀土及永磁材料板块、欧洲汽车与风电制造商股价、欧美关键矿产开采与回收标的、新能源金属相关ETF</span>
+                            </div>
+                            <div class="market-logic">定向放行缓解欧洲下游断供尾部风险，短期利好欧洲车企与风电企业的成本可见度、压制其风险溢价；同时确认供应工具化属性，抬升北美替代矿源的战略溢价与融资便利度，利好非中国开采与回收类资产估值；若后续欧盟获配额度收窄或许可延迟，磁材现货价格与下游库存成本将上行，反向压制欧洲新能源制造的毛利预期。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: China indicates rare earths will keep flowing to E...</span>
+                            <span>Thu, 15 Oct 2026 09:02:31 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">资本市场/AI信用</span>
+                                <span class="source-tag">WSJ Markets</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.3 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>7.8</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>8.9</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.2</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/finance/stocks/the-riskiest-corner-of-the-ai-trade-is-crashing-into-higher-rates-fcdaad37?mod=rss_markets_main" target="_blank">AI交易最风险角落撞上高利率，CoreWeave抛售 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：高利率冲击AI算力融资链，CoreWeave抛售暴露信用与估值脆弱性</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>以债务与租赁承诺扩张算力集群的CoreWeave股价大幅回撤，市场聚焦其高杠杆融资结构与再融资成本；同期债券收益率走高，信用市场对数据中心与AI基建类资产的定价趋严，形成股价与融资条件的负反馈。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>算力租赁商诉求为锁定长期客户合同与低成本资金；超大规模云厂商凭借自有现金流与信用优势扩大相对优势；债券投资者要求更高利差与更严契约条款；GPU供应商关注订单可持续性；二级市场投资者则从算力叙事转向现金流与折旧年限的审慎定价。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>AI基建的资金密集型属性在高利率环境下被重新定价，行业可能从全面扩张转向头部集中，具备自有现金流与投资级信用的厂商获得份额；长租约与设备折旧假设成为估值核心变量，若融资窗口收窄，中小算力运营商面临整合或资产出售，产业链议价权向芯片与电力资源端集中。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">CoreWeave及算力租赁类股票、AI数据中心相关高收益债与杠杆贷款、半导体板块ETF、10年期美债收益率、公用事业与电力基建股</span>
+                            </div>
+                            <div class="market-logic">利率上行直接抬高算力租赁商的再融资成本与利息覆盖压力，压缩其股权估值久期并触发信用利差走阔，形成股债双杀；资金从高贝塔AI基建标的撤向现金流稳定的软件与美债，纳指内部结构分化加剧；若抛售蔓延，GPU订单能见度与半导体资本开支预期下修，反向压制半导体板块估值，同时利好拥有自有电力和投资级信用的超大规模厂商的相对表现。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: The Riskiest Corner of the AI Trade Is Crashing In...</span>
+                            <span>Thu, 15 Oct 2026 21:00:00 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">资本市场/金融稳定</span>
+                                <span class="source-tag">WSJ Markets</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.0 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>7.5</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>8.4</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.0</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/finance/investing/a-popular-tax-minimizing-trade-is-juicing-wall-streets-borrowing-binge-6d81eac2?mod=rss_markets_main" target="_blank">流行避税交易助推华尔街借贷狂潮，嘉信理财保证金贷款近1900亿美元 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：避税交易放大保证金贷款规模，潜藏券商与市场杠杆风险</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>嘉信理财第三季度保证金贷款余额升至约1900亿美元，增长主要由一类税务亏损收割型策略驱动；该策略通过维持高仓位并借入资金放大税损抵扣，使客户杠杆水平系统性抬升，券商保证金资产与收入同步扩张。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>券商诉求为扩大保证金利息收入并管理强平与合规风险；客户诉求为税负优化与收益放大；监管机构关注顺周期杠杆、披露充分性与零售投资者适当性；做市与清算机构关注极端行情下的追保压力；税务部门关注策略是否构成实质性避税安排。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>杠杆通过税务优化名义被顺利扩张，使零售与高净值客户的敞口与市场波动率形成正反馈；一旦回撤触发集中追保，券商将被迫顺周期收缩信贷，放大市场下行斜率；同时券商盈利对保证金利息的依赖度上升，使其业绩对利率与市场活跃度更为敏感，弱化传统经纪业务的防御属性。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">券商股尤其是零售经纪板块、标普500与纳指宽基指数波动率、保证金债务相关信用指标、短期融资利率</span>
+                            </div>
+                            <div class="market-logic">保证金贷款扩张在上涨行情中构成增量买盘并压低已实现波动率，利好券商净利息收入与指数估值；但当回撤触及维持担保比例，强制平仓将放大卖出压力，推动波动率指数跳升与流动性折价扩大；利率高企亦提高客户持仓成本，一旦税损收割收益无法覆盖融资成本，杠杆将被动去化，形成对指数与券商股的负向螺旋。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: A Popular Tax-Saving Trade is Juicing Wall Street’...</span>
+                            <span>Thu, 15 Oct 2026 19:08:00 GMT</span>
+                        </div>
+                    </div>
+            </div>
+
+            <!-- 第二板块：计算技术与开源前沿观察 -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">计算技术与开源工程前沿</span>
+                    <span class="section-code">[SEC-02 / COMPUTING & OPEN SOURCE]</span>
+                </div>
+
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">系统安全/广告基建</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.7 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.7</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.5</span> &nbsp;•&nbsp; 
+                            工程落地:<span>8.8</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://citizenlab.ca/research/how-discover-tech-turned-targeted-ads-into-a-pipeline-for-spyware/" target="_blank">AdFection：定向广告沦为零点击雇佣间谍软件管道 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：广告投放链被武器化为零点击间谍软件分发，重创移动安全与广告生态</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>该研究揭示一类以在线广告投放系统为投递层的高级威胁：攻击者滥用广告竞价、创意渲染与第三方SDK链路，在用户无交互条件下完成载荷触发与设备指纹匹配，属于零点击漏洞利用与广告供应链劫持的复合范式。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>传统防御依赖用户不点击恶意链接的假设，而该路径在浏览器与App的广告渲染环节即可触发，绕过了邮件网关、域名黑名单与用户警觉；研究推动将广告SDK与创意执行环境纳入沙箱隔离、权限最小化与供应链完整性校验的必测范畴。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区关注焦点集中在广告技术栈的权限边界、第三方SDK审计与小团队承担的信任成本；雇佣间谍软件商业化意味着攻击具备持续资金支持与规避能力，防御重心将从特征检测转向供应链准入、运行时隔离与出站流量审计，广告平台合规与安全责任被显著放大。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">移动广告平台与广告科技公司、浏览器与操作系统厂商、第三方SDK与移动安全厂商、隐私合规与供应链安全赛道</span>
+                            </div>
+                            <div class="market-logic">事件将放大监管与品牌对广告供应链的问责压力，广告平台需增加供应链审计与沙箱隔离投入，推高合规成本并可能收窄定向广告的可寻址库存，压制短期广告变现效率；同时利好移动安全、浏览器隔离与供应链安全厂商的需求与定价权；若主要平台强推SDK准入标准，缺乏合规能力的中小广告技术公司将被迫退出，行业集中度上升，头部平台的流量定价权进一步强化。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50101813" target="_blank">项目原帖: AdFection: Targeted ads turned into a pipelin...</a>
+                            <span class="stat-badge">391 ★/pts &nbsp;|&nbsp; 557 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">开源AI模型</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.6 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.8</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.6</span> &nbsp;•&nbsp; 
+                            工程落地:<span>8.2</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://research.meta.ai/blog/muse-spark-open" target="_blank">Muse Spark Open 开放发布 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：开源模型或推理栈高热发布，可能降低闭源AI依赖并重塑开发者生态</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>该项目以开放许可发布模型权重与配套推理代码，覆盖权重格式、量化配置与本地部署脚本，属于开源权重模型与推理栈一体化的工程范式，强调可自托管与可复现推理。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>针对闭源API的调用成本、数据出境与不可审计问题，提供可本地化部署与可微调替代方案，降低对单一供应商的依赖，并改善延迟、单位推理成本与数据主权方面的可控性。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区高热度讨论集中在量化显存占用、批处理吞吐、微调工具链完整度与许可证边界；其价值不在单点指标领先，而在于削弱闭源模型在长尾任务上的溢价空间，推动推理优化、私有化部署与模型运维工具链成为新的竞争焦点。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">闭源大模型API厂商、公有云AI推理服务、开源模型托管与推理平台、AI芯片与推理加速卡厂商、企业私有化部署集成商</span>
+                            </div>
+                            <div class="market-logic">开源权重直接压低同等能力层的API定价上限，迫使闭源厂商向高阶能力、企业治理与生态集成转移溢价来源；推理自托管需求上升利好本地算力与推理优化软件，削弱按调用量计费的云端推理收入弹性；同时扩大硬件需求的长尾分布，使加速卡与显存的性价比竞争更激烈，云厂商AI护城河从模型能力转向数据、合规与运维服务的捆绑能力。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50107379" target="_blank">项目原帖: Muse Spark Open...</a>
+                            <span class="stat-badge">610 ★/pts &nbsp;|&nbsp; 352 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">开源基础设施/路由安全</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.2 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>7.8</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.2</span> &nbsp;•&nbsp; 
+                            工程落地:<span>8.7</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://ipinfo.io/blog/rpki-protects-70-internet-routes" target="_blank">RPKI 已保护 70% 互联网路由，较一年前 54% 提升 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：互联网路由安全覆盖率跃升，显著降低BGP劫持与骨干网系统性风险</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>RPKI通过资源公钥基础设施为IP地址前缀与自治系统号签发加密签名，使路由起源授权可被密码学验证，从而在控制平面为BGP提供来源真实性校验，属于互联网核心路由安全的信任锚机制。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>针对BGP缺乏来源认证导致的错误宣告与路由劫持，RPKI结合ROA与路由起源验证显著压缩前缀被恶意或错误宣告的空间，降低流量被劫持、黑洞与大范围中断的风险，提升骨干网整体可用性。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>覆盖率达70%意味着验证已跨过规模拐点，运营商、云厂商与内容分发网络缺乏ROA将面临路由不可达的惩罚性压力，社区焦点转向部署自动化、失效回退策略与向路由清洁化过渡的运维成本，安全能力从可选加固转为互联互通的准入门槛。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">云厂商与CDN网络基础设施、运营商骨干网资本开支、互联网交换点与DNS安全服务、网络安全与网络自动化软件厂商</span>
+                            </div>
+                            <div class="market-logic">覆盖率提升将从净化过滤中受益方转为强制合规方，未部署ROA的中小运营商与托管商需追加工程投入，抬升网络运维软件与安全服务需求；对大型云与CDN而言，路由完整性成为可用性SLA的竞争要素，网络可靠性溢价强化其客户粘性与定价权；若发生因验证导致的大规模不可达事故，则短期将放大对过渡机制与冗余架构的投入，进一步推高网络基础设施与自动化赛道的资本开支。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50112330" target="_blank">项目原帖: RPKI Now Protects 70% of Internet Routes, Up ...</a>
+                            <span class="stat-badge">19 ★/pts &nbsp;|&nbsp; 1 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">AI图像系统</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.1 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.3</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>7.9</span> &nbsp;•&nbsp; 
+                            工程落地:<span>8.2</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.krea.ai/krea-3" target="_blank">Krea 3：面向规模化编辑的图像模型 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：面向规模化编辑的图像模型，提升生成式视觉工作流的生产效率</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>该模型面向高吞吐图像编辑场景设计，采用可交互的生成式编辑范式，支持局部重绘、风格一致性与批量处理，核心在推理调度与编辑可控性而非单张画面质量竞赛。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>针对传统生成模型在批量编辑时一致性与可控性差、单张交互延迟高的问题，提供面向生产流水线的批处理与可编排编辑能力，缓解设计师在迭代成本与素材一致性上的瓶颈。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区关注焦点在于批量一致性、许可证授权与商业素材合规；其竞争力取决于编辑精度与吞吐成本的平衡，将推动视觉生成从单点工具转向可嵌入设计流水线的规模化服务，创意工具供应商的分发与订阅粘性面临重估。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">商业设计软件与创意工具订阅厂商、图像生成API服务商、云GPU推理算力供应商、数字内容与营销素材平台</span>
+                            </div>
+                            <div class="market-logic">规模化可编辑能力将图像生成从附加功能升级为核心工作流组件，挤压传统设计与素材库订阅的增量空间，迫使创意软件厂商加快原生集成或面临用户流失；同时抬高单位可用产出，扩大对低成本推理算力的需求，利好推理侧GPU与优化软件；若定价权向具备批量编辑能力的模型方转移，创意工具的订阅提价逻辑将被削弱，行业议价权从渠道转向模型与算力供应端。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50105648" target="_blank">项目原帖: Krea 3 – An image model built for editing at ...</a>
+                            <span class="stat-badge">248 ★/pts &nbsp;|&nbsp; 83 评论/分支</span>
+                        </div>
+                    </div>
+            </div>
+
+        </div>
+
+        <!-- 脚注 -->
+        <div class="footer">
+            多源聚合：CNBC Markets、Wall Street Journal、BBC World News、Hacker News、GitHub Trending。<br>
+            多维评级：宏观（地缘战略 / 市场敏感 / 结构外溢），技术（架构突破 / 商业重塑 / 工程落地）。仅供专业研判参考。
+        </div>
+    </div>
+</body>
+</html>
