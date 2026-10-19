@@ -2,7 +2,7 @@
 Inbox Agent (智能邮件助手)
 - 运行机制：
   1. 状态持久化 (InboxMemory)：记录已分类邮件 ID，防重防漏
-  2. 邮箱交互 (GmailClient)：安全连接 IMAP 抓取收件箱近 2 天未处理邮件
+  2. 邮箱交互 (inbox_agent.imap)：安全连接 IMAP 抓取收件箱近 2 天未处理邮件
   3. 智能认知分流 (DeepSeek Flash)：识别待办日程 (schedule)、重要联络 (important)、系统资讯 (newsletter_system)、营销推广 (spam_marketing)
   4. 深度托管安全执行：
      - 将垃圾推广邮件安全搬移至 [Gmail]/Spam（绝不直接删除当前邮件）
@@ -19,7 +19,6 @@ from pathlib import Path
 from inbox_agent.classifier import classify_email
 from inbox_agent.config import (
     DEEPSEEK_API_KEY,
-    FETCH_DAYS_LIMIT,
     GMAIL_APP_PASS,
     GMAIL_USER,
     IS_CI,
@@ -28,7 +27,7 @@ from inbox_agent.config import (
     get_now_bjt,
     validate_config,
 )
-from inbox_agent.imap_client import GmailClient, mutf7_decode
+from inbox_agent.imap import ImapConnection, LabelService, MessageRepo
 from inbox_agent.memory import InboxMemory
 from inbox_agent.renderer import render_email_report
 from utils.mailer import send_email_html
@@ -52,27 +51,34 @@ def main():
     print(f"=== [Inbox Agent] 智能邮件助手启动 ({now_dt.strftime('%Y-%m-%d %H:%M:%S')} BJT) ===")
 
     memory = InboxMemory()
-    client = GmailClient(username=GMAIL_USER, password=GMAIL_APP_PASS)
+    conn = ImapConnection(username=GMAIL_USER, password=GMAIL_APP_PASS)
+    repo = MessageRepo(conn)
+    label_service = LabelService(conn)
 
     print("[IMAP] 正在连接 Gmail 检查收件箱与垃圾箱...")
-    if not client.connect():
-        print("[IMAP Fatal Error] Gmail 登录/鉴权失败，请检查 GMAIL_USER 与 GMAIL_APP_PASS 凭据", file=sys.stderr)
+    try:
+        conn.connect()
+    except Exception as e:
+        print(f"[IMAP Fatal Error] Gmail 登录/鉴权失败: {e}", file=sys.stderr)
         sys.exit(1)
 
     try:
-        raw_emails = client.fetch_recent_emails(
-            days=FETCH_DAYS_LIMIT,
-            max_count=MAX_EMAILS_PER_RUN,
+        fetched_emails = repo.fetch_emails(
+            code="inbox",
+            limit=MAX_EMAILS_PER_RUN,
             is_processed_func=memory.is_processed,
         )
+        raw_emails = [e.to_dict() for e in fetched_emails]
         print(f"[IMAP] 获取到收件箱近期邮件: {len(raw_emails)} 封")
     except Exception as e:
         print(f"[IMAP Fatal Error] 获取收件箱邮件异常: {e}", file=sys.stderr)
-        client.close()
+        conn.close()
         sys.exit(1)
 
+    raw_spam_emails = []
     try:
-        raw_spam_emails = client.fetch_recent_spam_emails(days=FETCH_DAYS_LIMIT, max_count=30)
+        fetched_spams = repo.fetch_emails(code="spam", limit=30)
+        raw_spam_emails = [e.to_dict() for e in fetched_spams]
         print(f"[IMAP] 获取到垃圾箱近期待复核邮件: {len(raw_spam_emails)} 封")
     except Exception as e:
         print(f"[IMAP Warning] 获取垃圾箱邮件异常: {e}", file=sys.stderr)
@@ -80,10 +86,6 @@ def main():
     # 1. 过滤已处理收件箱邮件
     unprocessed_emails = [e for e in raw_emails if not memory.is_processed(e.get("message_id"))]
     print(f"[过滤] 待分类新邮件: {len(unprocessed_emails)} 封 (已跳过历史处理邮件 {len(raw_emails) - len(unprocessed_emails)} 封)")
-
-    # 预先获取并缓存目标文件夹，避免频繁请求
-    promotions_folder = client.get_promotions_folder_name()
-    notifications_folder = client.get_notifications_folder_name()
 
     schedules = []
     importants = []
@@ -104,18 +106,22 @@ def main():
         batch_num = (batch_idx // BATCH_SIZE) + 1
         print(f"\n--- [批次 {batch_num}/{total_batches}] 正在研判 {len(batch)} 封收件箱新邮件 ---")
 
-        batch_marketings_uids = []
-        batch_systems_uids = []
-        batch_spams_uids = []
+        batch_marketings_uids: list[int] = []
+        batch_systems_uids: list[int] = []
+        batch_spams_uids: list[int] = []
 
         for item in batch:
-            if client.imap:
-                client.noop()
+            if conn.is_connected():
+                try:
+                    conn.noop()
+                except Exception:
+                    pass
 
             c_res = classify_email(item, DEEPSEEK_API_KEY, my_email=GMAIL_USER)
             merged = {**item, **c_res}
             cat = c_res.get("category", "newsletter_system")
-            uid = item.get("uid")
+            raw_uid = item.get("uid")
+            uid = int(raw_uid) if raw_uid is not None else None
             m_id = item.get("message_id")
 
             if cat == "schedule":
@@ -154,16 +160,16 @@ def main():
                 memory.mark_processed(m_id, is_spam=False)
 
         # 本批次即时执行 IMAP 移动
-        if client.imap:
+        if conn.is_connected():
             if batch_marketings_uids:
-                b_m = client.archive_emails(batch_marketings_uids, folder_name=promotions_folder)
-                marketings_moved_count += b_m
+                label_service.set_labels(batch_marketings_uids, add=["promotions"], remove=["inbox"])
+                marketings_moved_count += len(batch_marketings_uids)
             if batch_systems_uids:
-                b_s = client.archive_emails(batch_systems_uids, folder_name=notifications_folder)
-                systems_moved_count += b_s
+                label_service.set_labels(batch_systems_uids, add=["system_notification"], remove=["inbox"])
+                systems_moved_count += len(batch_systems_uids)
             if batch_spams_uids:
-                b_sp = client.move_to_spam(batch_spams_uids)
-                spams_moved_count += b_sp
+                label_service.set_labels(batch_spams_uids, add=["spam"], remove=["inbox"])
+                spams_moved_count += len(batch_spams_uids)
 
         # 本批次即时保存记忆库，防止网络偶发异常或中断丢失成果
         memory.save()
@@ -174,23 +180,29 @@ def main():
     if unprocessed_spams:
         print(f"\n[垃圾箱复核] 正在对 Google 拦截的 {len(unprocessed_spams)} 封垃圾邮件进行排查...")
         for item in unprocessed_spams:
-            if client.imap:
-                client.noop()
+            if conn.is_connected():
+                try:
+                    conn.noop()
+                except Exception:
+                    pass
             c_res = classify_email(item, DEEPSEEK_API_KEY, my_email=GMAIL_USER)
             cat = c_res.get("category", "spam")
             merged = {**item, **c_res}
             if cat != "spam":
                 # 判定为非垃圾邮件 -> 属于 Google 误杀，直接放回对应目录并按正常邮件处理
                 if cat == "marketing":
-                    target_dest = promotions_folder
+                    target_add = ["promotions"]
+                    display_dest = "商业推广"
                 elif cat == "newsletter_system":
-                    target_dest = notifications_folder
+                    target_add = ["system_notification"]
+                    display_dest = "系统通知"
                 else:
-                    target_dest = "INBOX"
-                display_dest = mutf7_decode(target_dest)
+                    target_add = ["inbox"]
+                    display_dest = "INBOX"
                 print(f"[误杀处理] 发现被误判邮件: '{item.get('subject')}' (归属: {cat})，放回 {display_dest} 并按常规邮件处理...")
-                if client.imap:
-                    client.rescue_from_spam(item.get("uid"), target_folder=target_dest)
+                raw_uid = item.get("uid")
+                if conn.is_connected() and raw_uid is not None:
+                    label_service.set_labels([int(raw_uid)], add=target_add, remove=["spam"])
 
                 # 直接按常规邮件分流到对应分类
                 if cat == "schedule":
@@ -210,8 +222,8 @@ def main():
 
         memory.save()
 
-    if client.imap:
-        client.close()
+    if conn.is_connected():
+        conn.close()
 
     # 组织报告时间与插槽
     date_str = now_dt.strftime("%Y-%m-%d")
