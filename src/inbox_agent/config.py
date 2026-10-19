@@ -16,6 +16,8 @@ __all__ = [
     "FETCH_DAYS_LIMIT",
     "GMAIL_APP_PASS",
     "GMAIL_USER",
+    "HISTORY_MEMORY_FILE",
+    "INBOX_MEMORY_FILE",
     "INBOX_STATE_KEY",
     "IS_CI",
     "MAX_EMAILS_PER_RUN",
@@ -62,7 +64,9 @@ CURRENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = CURRENT_DIR.parent.parent
 
 # 状态与持久化路径 (统一存储于 state/inbox-agent，使用 Fernet 加密存储以保护公开仓库隐私)
-MEMORY_FILE = REPO_ROOT / "state" / "inbox-agent" / "history.enc"
+INBOX_MEMORY_FILE = REPO_ROOT / "state" / "inbox-agent" / "inbox_state.enc"
+HISTORY_MEMORY_FILE = REPO_ROOT / "state" / "inbox-agent" / "history_state.enc"
+MEMORY_FILE = INBOX_MEMORY_FILE  # 兼容旧代码引用
 
 # 模板路径
 TEMPLATES_HTML_DIR = CURRENT_DIR / "templates" / "html"
