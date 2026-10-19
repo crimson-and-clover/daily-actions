@@ -3,8 +3,6 @@ name: OpenHands AI PR Review
 on:
   issue_comment:
     types: [created]
-  pull_request:
-    types: [opened, synchronize]
 
 permissions:
   contents: read
@@ -13,14 +11,11 @@ permissions:
 
 jobs:
   ai-review:
-    # 满足以下任一条件时执行：
-    # 1. PR 刚创建打开 (pull_request opened)
-    # 2. PR 评论中包含 /ai-review 指令且由作者/协作者触发 (issue_comment created)
+    # 仅当在 PR 评论中明确包含 /ai-review 且由仓库所有者/协作者触发时执行
     if: |
-      github.event_name == 'pull_request' ||
-      (github.event.issue.pull_request != null &&
-       contains(github.event.comment.body, '/ai-review') &&
-       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, '/ai-review') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-24.04
 
     steps:
