@@ -131,6 +131,43 @@ class MessageRepo:
             "truncated": truncated,
         }
 
+    def get_email_by_message_id(
+        self,
+        message_id: str,
+        code: str = "inbox",
+        max_length: int = 4000,
+    ) -> dict[str, Any] | None:
+        """根据 RFC 822 Message-ID 查找并读取邮件 (双引擎支持: Gmail 原生语法 + IMAP RFC 3501 标准语法)"""
+        clean_id = (message_id or "").strip()
+        if not clean_id:
+            return None
+
+        folder = LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code
+        self.connection.select_folder(folder)
+        client = self.connection.client
+
+        # 1. 优先尝试 Gmail X-GM-EXT-1 专属扩展语法 (毫秒级全邮箱检索)
+        uids: list[int] = []
+        try:
+            uids = client.gmail_search(f"rfc822msgid:{clean_id.strip('<>')}")
+        except Exception:
+            pass
+
+        # 2. 回退至标准 IMAP RFC 3501 语法: HEADER Message-ID 检索 (通用各大邮件服务商)
+        if not uids:
+            try:
+                uids = client.search([b"HEADER", b"Message-ID", clean_id.encode("utf-8")])
+                if not uids and not clean_id.startswith("<"):
+                    wrapped_id = f"<{clean_id}>"
+                    uids = client.search([b"HEADER", b"Message-ID", wrapped_id.encode("utf-8")])
+            except Exception:
+                pass
+
+        if not uids:
+            return None
+
+        return self.read_email_content(email_uid=uids[0], code=code, max_length=max_length)
+
     def search_emails(
         self,
         query: str = "",
