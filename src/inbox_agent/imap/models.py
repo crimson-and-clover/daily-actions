@@ -41,7 +41,8 @@ class Email(BaseModel):
     raw_html: str = ""
     attachments: list[dict[str, Any]] = Field(default_factory=list)
     unsubscribe_link: str = ""
-    folder: str = "INBOX"
+    labels: list[str] = Field(default_factory=list)
+    codes: list[str] = Field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为字典对象 (包含兼容字段 id)"""

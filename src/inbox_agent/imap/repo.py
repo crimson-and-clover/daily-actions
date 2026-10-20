@@ -8,8 +8,10 @@ from collections.abc import Callable
 from email import policy
 from typing import Any
 
+from imapclient.imap_utf7 import decode as utf7_decode
+
 from inbox_agent.imap.connection import ImapConnection
-from inbox_agent.imap.labels import LABEL_SPECS
+from inbox_agent.imap.labels import LABEL_SPECS, labels_to_codes
 from inbox_agent.imap.models import Email
 from inbox_agent.imap.parser import parse_email_message
 
@@ -55,8 +57,8 @@ class MessageRepo:
             if message_id and is_processed_func and is_processed_func(message_id):
                 continue
 
-            # 2. 抓取完整邮件报文，失败直接 Fail-Fast
-            full_fetch = client.fetch([uid], [b"RFC822"])
+            # 2. 抓取完整邮件报文与 Gmail 原生标签，失败直接 Fail-Fast
+            full_fetch = client.fetch([uid], [b"RFC822", b"X-GM-LABELS"])
             if not full_fetch or uid not in full_fetch:
                 raise RuntimeError(f"未能抓取 UID {uid} 的 RFC822 完整报文")
 
@@ -65,6 +67,15 @@ class MessageRepo:
                 raise RuntimeError(f"UID {uid} 的 RFC822 报文内容为空")
 
             parsed = parse_email_message(raw_email_bytes)
+
+            raw_labels = full_fetch[uid].get(b"X-GM-LABELS", ())
+            labels: list[str] = [
+                utf7_decode(lbl) if isinstance(lbl, bytes) else str(lbl)
+                for lbl in raw_labels
+            ]
+            codes = labels_to_codes(labels)
+            if not codes and code in LABEL_SPECS:
+                codes = [code]
 
             emails.append(
                 Email(
@@ -79,7 +90,8 @@ class MessageRepo:
                     raw_html=parsed["raw_html"],
                     attachments=parsed["attachments"],
                     unsubscribe_link=parsed["unsubscribe_link"],
-                    folder=folder,
+                    labels=labels,
+                    codes=codes,
                 )
             )
 
@@ -204,13 +216,23 @@ class MessageRepo:
         selected_uids = list(reversed(uids))[:limit]
         emails: list[Email] = []
         for uid in selected_uids:
-            fetch_data = client.fetch([uid], [b"RFC822"])
+            fetch_data = client.fetch([uid], [b"RFC822", b"X-GM-LABELS"])
             if not fetch_data or uid not in fetch_data:
                 continue
             raw_email_bytes = fetch_data[uid].get(b"RFC822", b"")
             if not raw_email_bytes:
                 continue
             parsed = parse_email_message(raw_email_bytes)
+
+            raw_labels = fetch_data[uid].get(b"X-GM-LABELS", ())
+            labels: list[str] = [
+                utf7_decode(lbl) if isinstance(lbl, bytes) else str(lbl)
+                for lbl in raw_labels
+            ]
+            codes = labels_to_codes(labels)
+            if not codes and code in LABEL_SPECS:
+                codes = [code]
+
             emails.append(
                 Email(
                     uid=uid,
@@ -224,7 +246,8 @@ class MessageRepo:
                     raw_html=parsed["raw_html"],
                     attachments=parsed["attachments"],
                     unsubscribe_link=parsed["unsubscribe_link"],
-                    folder=folder,
+                    labels=labels,
+                    codes=codes,
                 )
             )
 
