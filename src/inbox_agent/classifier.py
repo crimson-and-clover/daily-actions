@@ -48,7 +48,7 @@ def classify_email(email_item: dict, api_key: str, my_email: str = "") -> dict:
 
     # 判定是否为本人或系统自发通知
     is_from_me = False
-    if my_email_lower and (my_email_lower == sender_real_addr or my_email_lower in from_addr_lower):
+    if my_email_lower and my_email_lower == sender_real_addr:
         is_from_me = True
     elif "daily actions" in from_addr_lower or sender_domain == "github.com" or sender_domain.endswith(".github.com"):
         is_from_me = True
@@ -92,45 +92,53 @@ def classify_email(email_item: dict, api_key: str, my_email: str = "") -> dict:
 
     last_content = ""
     for attempt in range(1, MAX_CLASSIFY_RETRIES + 1):
-        resp = client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
-            messages=[
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.1,
-            max_tokens=20000,
-        )
-        content = resp.choices[0].message.content or ""
-        last_content = content
-        parsed = parse_json_safely(content, strict=False)
+        try:
+            resp = client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+                max_tokens=20000,
+            )
+            content = resp.choices[0].message.content or ""
+            last_content = content
+            parsed = parse_json_safely(content)
 
-        if isinstance(parsed, dict) and "category" in parsed:
-            cat = parsed.get("category")
-            if cat in ["schedule", "important", "newsletter_system", "marketing", "spam"]:
-                parsed["category"] = cat
-                parsed["priority"] = parsed.get("priority", "P2")
-                parsed["tldr"] = parsed.get("tldr", subject[:30]).replace("\n", " ").strip()
-                parsed["action_items"] = parsed.get("action_items", [])
-                parsed["event_time"] = parsed.get("event_time", "")
-                parsed["event_date"] = parsed.get("event_date", "").strip()
-                # 智能提取提前通知天数
-                try:
-                    adv = int(parsed.get("advance_days", 0))
-                    parsed["advance_days"] = max(0, min(adv, 30))
-                except Exception:
-                    parsed["advance_days"] = 3 if cat == "schedule" else 0
-                parsed["reason"] = parsed.get("reason", "")
-                return parsed
+            if isinstance(parsed, dict) and "category" in parsed:
+                cat = parsed.get("category")
+                if cat in ["schedule", "important", "newsletter_system", "marketing", "spam"]:
+                    parsed["category"] = cat
+                    parsed["priority"] = parsed.get("priority", "P2")
+                    tldr = parsed.get("tldr")
+                    parsed["tldr"] = (tldr if isinstance(tldr, str) and tldr.strip() else subject[:30]).replace("\n", " ").strip()
+                    action_items = parsed.get("action_items")
+                    parsed["action_items"] = action_items if isinstance(action_items, list) else []
+                    parsed["event_time"] = (parsed.get("event_time") or "").strip()
+                    parsed["event_date"] = (parsed.get("event_date") or "").strip()
+                    # 智能提取提前通知天数
+                    try:
+                        adv = int(parsed.get("advance_days", 0))
+                        parsed["advance_days"] = max(0, min(adv, 30))
+                    except Exception:
+                        parsed["advance_days"] = 3 if cat == "schedule" else 0
+                    parsed["reason"] = (parsed.get("reason") or "").strip()
+                    return parsed
+                else:
+                    print(
+                        f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次分类输出未知的类别 '{cat}'，准备重试...",
+                        file=sys.stderr,
+                    )
             else:
                 print(
-                    f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次分类输出未知的类别 '{cat}'，准备重试...",
+                    f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次未能解析为合法分类 JSON，准备重试... 原始内容: {content[:200]}",
                     file=sys.stderr,
                 )
-        else:
+        except Exception as e:
             print(
-                f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次未能解析为合法分类 JSON，准备重试... 原始内容: {content[:200]}",
+                f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次调用或解析异常: {e}，准备重试...",
                 file=sys.stderr,
             )
 
@@ -180,42 +188,50 @@ def classify_history_email(email_item: dict, api_key: str, my_email: str = "") -
 
     last_content = ""
     for attempt in range(1, MAX_CLASSIFY_RETRIES + 1):
-        resp = client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
-            messages=[
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.1,
-            max_tokens=20000,
-        )
-        content = resp.choices[0].message.content or ""
-        last_content = content
-        parsed = parse_json_safely(content, strict=False)
+        try:
+            resp = client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+                max_tokens=20000,
+            )
+            content = resp.choices[0].message.content or ""
+            last_content = content
+            parsed = parse_json_safely(content)
 
-        if isinstance(parsed, dict) and "action" in parsed:
-            act = parsed.get("action")
-            if act in ["delete", "archive_notifications", "archive_promotions", "archive_general", "keep_inbox"]:
-                parsed["action"] = act
-                parsed["tldr"] = parsed.get("tldr", subject[:30]).replace("\n", " ").strip()
-                parsed["action_items"] = parsed.get("action_items", [])
-                parsed["event_date"] = (parsed.get("event_date") or "").strip()
-                parsed["event_time"] = (parsed.get("event_time") or "").strip()
-                try:
-                    parsed["advance_days"] = max(0, min(int(parsed.get("advance_days", 0)), 30))
-                except Exception:
-                    parsed["advance_days"] = 0
-                parsed["reason"] = parsed.get("reason", "")
-                return parsed
+            if isinstance(parsed, dict) and "action" in parsed:
+                act = parsed.get("action")
+                if act in ["delete", "archive_notifications", "archive_promotions", "archive_general", "keep_inbox"]:
+                    parsed["action"] = act
+                    tldr = parsed.get("tldr")
+                    parsed["tldr"] = (tldr if isinstance(tldr, str) and tldr.strip() else subject[:30]).replace("\n", " ").strip()
+                    action_items = parsed.get("action_items")
+                    parsed["action_items"] = action_items if isinstance(action_items, list) else []
+                    parsed["event_date"] = (parsed.get("event_date") or "").strip()
+                    parsed["event_time"] = (parsed.get("event_time") or "").strip()
+                    try:
+                        parsed["advance_days"] = max(0, min(int(parsed.get("advance_days", 0)), 30))
+                    except Exception:
+                        parsed["advance_days"] = 0
+                    parsed["reason"] = (parsed.get("reason") or "").strip()
+                    return parsed
+                else:
+                    print(
+                        f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次历史决策输出未知的动作 '{act}'，准备重试...",
+                        file=sys.stderr,
+                    )
             else:
                 print(
-                    f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次历史决策输出未知的动作 '{act}'，准备重试...",
+                    f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次历史决策未能解析为合法 JSON，准备重试... 原始内容: {content[:200]}",
                     file=sys.stderr,
                 )
-        else:
+        except Exception as e:
             print(
-                f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次历史决策未能解析为合法 JSON，准备重试... 原始内容: {content[:200]}",
+                f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次历史决策调用或解析异常: {e}，准备重试...",
                 file=sys.stderr,
             )
 
