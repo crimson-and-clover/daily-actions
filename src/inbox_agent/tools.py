@@ -5,6 +5,7 @@ Inbox Agent 工具系统 (Tools Definition & Modular Dispatcher)
 
 import hashlib
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 import openai
@@ -102,122 +103,13 @@ class CreateDraftArgs(BaseModel):
 
 
 # ==============================================================================
-# 2. 批次跟踪与工具执行上下文 (Batch Tracker & Tool Context)
+# 2. 工具执行上下文 (Tool Context)
 # ==============================================================================
 
 
 @dataclass
-class BatchTracker:
-    """简洁直观的邮件处理结果收集器 (支持跨目录隔绝与归档分流)"""
-
-    # 当前批次邮件缓存 {(code, uid): email_dict}
-    email_map: dict[tuple[str, int], dict] = field(default_factory=dict)
-
-    # 分类结果直接列表（扁平直观，对应最终报告栏目）
-    importants: list[dict] = field(default_factory=list)
-    systems: list[dict] = field(default_factory=list)
-    marketings: list[dict] = field(default_factory=list)
-    archives: list[dict] = field(default_factory=list)
-    spams: list[dict] = field(default_factory=list)
-    rescued_items: list[dict] = field(default_factory=list)
-    schedules: list[dict] = field(default_factory=list)
-    created_drafts: list[dict] = field(default_factory=list)
-
-    # 记录已移出收件箱的 UID 集合 {(code, uid)}
-    moved_keys: set[tuple[str, int]] = field(default_factory=set)
-
-    @property
-    def marketings_moved_count(self) -> int:
-        return len(self.marketings)
-
-    @property
-    def systems_moved_count(self) -> int:
-        return len(self.systems)
-
-    @property
-    def archives_moved_count(self) -> int:
-        return len(self.archives)
-
-    @property
-    def spams_moved_count(self) -> int:
-        return len(self.spams)
-
-    def init_batch(self, emails: list[dict], code: str = "inbox"):
-        """批次开始前载入邮件映射缓存，以 (code, uid) 为复合键隔绝不同目录同名 UID"""
-        for e in emails:
-            raw_uid = e.get("uid")
-            if raw_uid is not None:
-                self.email_map[(code, int(raw_uid))] = dict(e)
-
-    # 保持兼容命名
-    register_batch_emails = init_batch
-
-    def get_email(self, uid: int, code: str = "inbox") -> dict | None:
-        """根据 UID 和目录 code 获取邮件信息"""
-        if (code, uid) in self.email_map:
-            return self.email_map[(code, uid)]
-        # 兜底查找任意目录下的此 UID
-        for (_c, u), item in self.email_map.items():
-            if u == uid:
-                return item
-        return None
-
-    def record_labels(
-        self,
-        uids: list[int],
-        add: list[str],
-        remove: list[str],
-        tldr: str = "",
-        code: str = "inbox",
-    ):
-        """记录标签变更结果"""
-        for uid in uids:
-            key = (code, uid)
-            source = self.email_map.get(key)
-            if source is None:
-                # 寻找兜底匹配
-                source = self.get_email(uid, code=code)
-            if source is None:
-                continue
-
-            if tldr:
-                source["tldr"] = tldr
-            elif not source.get("tldr"):
-                source["tldr"] = source.get("subject", "")
-
-            email_item = dict(source)
-
-            # 垃圾箱解救
-            if "spam" in remove and ("inbox" in add or not add):
-                if not any(it.get("uid") == uid for it in self.rescued_items):
-                    self.rescued_items.append(email_item)
-
-            # 移动归类
-            if "inbox" in remove or code == "inbox":
-                self.moved_keys.add(key)
-                if "promotions" in add:
-                    self.marketings.append(email_item)
-                elif "system_notification" in add:
-                    self.systems.append(email_item)
-                elif "archive" in add:
-                    self.archives.append(email_item)
-                elif "spam" in add:
-                    self.spams.append(email_item)
-
-    def finalize_importants(self):
-        """批次结算：未被移出收件箱的邮件自动归入 importants"""
-        for (code, uid), email_item in self.email_map.items():
-            if code == "inbox" and (code, uid) not in self.moved_keys:
-                if not any(it.get("uid") == uid for it in self.importants):
-                    item_dict = dict(email_item)
-                    if not item_dict.get("tldr"):
-                        item_dict["tldr"] = item_dict.get("subject", "")
-                    self.importants.append(item_dict)
-
-
-@dataclass
 class ToolContext:
-    """贯穿 Agent 工具调用的全局执行上下文"""
+    """贯穿 Agent 工具调用的全局执行上下文 (纯净无状态，由外部 Orchestrator 注入)"""
 
     connection: ImapConnection
     repo: MessageRepo
@@ -225,8 +117,8 @@ class ToolContext:
     flag_service: FlagService
     draft_service: DraftService
     memory: InboxMemory
-    tracker: BatchTracker
     current_code: str = "inbox"
+    current_emails: list[dict[str, Any]] = field(default_factory=list)
 
 
 # ==============================================================================
@@ -258,9 +150,6 @@ def _handle_apply_labels(args: ApplyLabelsArgs, ctx: ToolContext) -> dict[str, A
 
     # 底层执行原子标签操作
     ctx.label_service.set_labels(uids=uids, add=add, remove=remove)
-
-    # 记录到批次追踪器
-    ctx.tracker.record_labels(uids=uids, add=add, remove=remove, tldr=tldr, code=code)
 
     add_names = [LABEL_SPECS[a].label_name for a in add]
     remove_names = [LABEL_SPECS[r].label_name for r in remove]
@@ -298,16 +187,15 @@ def _handle_read_email_content(args: ReadEmailContentArgs, ctx: ToolContext) -> 
 
 def _handle_search_emails(args: SearchEmailsArgs, ctx: ToolContext) -> dict[str, Any]:
     code = args.code or ctx.current_code
-    results = ctx.repo.search_emails(
+    emails = ctx.repo.search_emails(
         query=args.query,
         code=code,
         unread_only=args.unread_only,
         sender=args.sender,
         limit=args.limit,
     )
-    # 自动将搜索结果加入当前上下文缓存，避免后续按 UID 提取日程时找不到
-    if results:
-        ctx.tracker.init_batch(results, code=code)
+    # 统一返回完整的 Email 对象字典 (包含全部 13 个字段)，不再丢失正文与附件
+    results = [e.to_dict() for e in emails]
     return {"status": "success", "count": len(results), "results": results}
 
 
@@ -324,10 +212,19 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
             "message": "message_id 不能为空，日程必须绑定具体邮件的全局 Message-ID",
         }
 
+    # 严格真实日历日期校验 (拦截 2026-02-30, 2026-13-01 等非法日期)
+    try:
+        datetime.strptime(event_date, "%Y-%m-%d")
+    except ValueError:
+        return {
+            "status": "error",
+            "message": f"event_date '{event_date}' 不是合法的日历日期 (格式须为 YYYY-MM-DD 且日期真实存在)",
+        }
+
     email_info: dict[str, Any] = {}
 
-    # 1. 本地批次缓存快速查验与获取元数据
-    for item in ctx.tracker.email_map.values():
+    # 1. 优先从当前批次传入的邮件列表快速匹配
+    for item in ctx.current_emails:
         if item.get("message_id") == m_id:
             email_info = item
             break
@@ -336,7 +233,7 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
     if not email_info and ctx.memory.is_processed(m_id):
         email_info = {"message_id": m_id}
 
-    # 3. 若本地未命中且 IMAP 在线，调用双引擎 (Gmail + RFC 3501) 检索真实性并补齐元数据
+    # 3. 若本地未命中且 IMAP 在线，调用双引擎检索真实性并补齐元数据
     if not email_info and ctx.connection.is_connected():
         try:
             fetched_email = ctx.repo.get_email_by_message_id(m_id, code=ctx.current_code)
@@ -373,8 +270,9 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
     }
 
     item = ctx.memory.add_schedule(schedule_payload)
+    # 即时落盘保存状态，防止进程中断导致日程丢失
+    ctx.memory.save()
     item_dict = item.model_dump() if item is not None else schedule_payload
-    ctx.tracker.schedules.append(item_dict)
 
     return {
         "status": "success",
@@ -390,6 +288,8 @@ def _handle_list_calendar_events(_args: ListCalendarEventsArgs, ctx: ToolContext
 
 def _handle_remove_calendar_event(args: RemoveCalendarEventArgs, ctx: ToolContext) -> dict[str, Any]:
     success = ctx.memory.remove_schedule(args.schedule_id)
+    if success:
+        ctx.memory.save()
     return {
         "status": "success" if success else "not_found",
         "schedule_id": args.schedule_id,
@@ -410,7 +310,6 @@ def _handle_create_email_draft(args: CreateDraftArgs, ctx: ToolContext) -> dict[
         "body": args.body,
         "in_reply_to": args.in_reply_to,
     }
-    ctx.tracker.created_drafts.append(draft_info)
     return {"status": "success", "draft": draft_info, "message": f"成功为 {args.to_addr} 创建草稿"}
 
 

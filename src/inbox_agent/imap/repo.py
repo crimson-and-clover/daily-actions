@@ -175,8 +175,8 @@ class MessageRepo:
         unread_only: bool = False,
         sender: str = "",
         limit: int = 10,
-    ) -> list[dict[str, Any]]:
-        """按关键词、发件人、未读状态检索邮件元数据 (Fail-Fast)"""
+    ) -> list[Email]:
+        """按关键词、发件人、未读状态检索邮件，返回完整的 Email 领域实体列表 (Fail-Fast)"""
         folder = LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code
         self.connection.select_folder(folder)
         client = self.connection.client
@@ -202,49 +202,30 @@ class MessageRepo:
             return []
 
         selected_uids = list(reversed(uids))[:limit]
-        fetch_data = client.fetch(selected_uids, [b"ENVELOPE", b"BODY.PEEK[TEXT]<0.600>"])
-
-        results: list[dict[str, Any]] = []
+        emails: list[Email] = []
         for uid in selected_uids:
-            if uid not in fetch_data:
+            fetch_data = client.fetch([uid], [b"RFC822"])
+            if not fetch_data or uid not in fetch_data:
                 continue
-            item = fetch_data[uid]
-            env = item.get(b"ENVELOPE")
-            raw_snip = item.get(b"BODY[TEXT]<0>", b"")
-
-            clean_snip = (
-                raw_snip.decode("utf-8", errors="ignore")
-                .replace("\r", " ")
-                .replace("\n", " ")
-                .strip()[:200]
+            raw_email_bytes = fetch_data[uid].get(b"RFC822", b"")
+            if not raw_email_bytes:
+                continue
+            parsed = parse_email_message(raw_email_bytes)
+            emails.append(
+                Email(
+                    uid=uid,
+                    message_id=parsed["message_id"],
+                    subject=parsed["subject"],
+                    from_addr=parsed["from_addr"],
+                    to_addr=parsed["to_addr"],
+                    date=parsed["date"],
+                    snippet=parsed["body"][:1000],
+                    body=parsed["body"],
+                    raw_html=parsed["raw_html"],
+                    attachments=parsed["attachments"],
+                    unsubscribe_link=parsed["unsubscribe_link"],
+                    folder=folder,
+                )
             )
 
-            subject = "无主题"
-            from_addr = "未知发件人"
-            date_str = ""
-            message_id = ""
-
-            if env:
-                date_str = str(env.date or "")
-                message_id = env.message_id.decode("ascii", errors="ignore") if env.message_id else ""
-                if env.subject:
-                    subject = email.header.make_header(
-                        email.header.decode_header(env.subject.decode("latin1", errors="ignore"))
-                    ).__str__()
-                if env.from_ and len(env.from_) > 0:
-                    addr = env.from_[0]
-                    mailbox = addr.mailbox.decode("ascii", errors="ignore") if addr.mailbox else ""
-                    host = addr.host.decode("ascii", errors="ignore") if addr.host else ""
-                    from_addr = f"{mailbox}@{host}" if host else mailbox
-
-            results.append({
-                "uid": uid,
-                "folder": folder,
-                "subject": subject,
-                "from_addr": from_addr,
-                "date": date_str,
-                "message_id": message_id,
-                "snippet": clean_snip,
-            })
-
-        return results
+        return emails
