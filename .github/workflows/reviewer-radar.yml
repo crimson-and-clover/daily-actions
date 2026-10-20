@@ -1,0 +1,61 @@
+name: Reviewer Radar (NIW Oriented)
+
+on:
+  schedule:
+    # 每天早上 (08:30 BJT -> 00:30 UTC) 运行一次
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-reviewer-radar:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Code (master)
+        uses: actions/checkout@v7
+
+      - name: Checkout Agent State (state/reviewer-radar branch)
+        uses: actions/checkout@v7
+        with:
+          ref: state/reviewer-radar
+          path: state
+          fetch-depth: 0
+        continue-on-error: true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Run Reviewer Radar
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASS: ${{ secrets.GMAIL_APP_PASS }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENREVIEW_PROFILE_ID: ${{ secrets.OPENREVIEW_PROFILE_ID }}
+          GOOGLE_SCHOLAR_URL: ${{ secrets.GOOGLE_SCHOLAR_URL }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          uv run python -m reviewer_radar.agent
+
+      - name: Commit and push memory updates to state branch
+        if: always() && hashFiles('state/.git/config') != ''
+        working-directory: state
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          mkdir -p reviewer-radar
+          if [ -f reviewer-radar/history.json ]; then
+            git add reviewer-radar/history.json
+            if ! git diff --staged --quiet; then
+              git commit -m "chore(reviewer-radar): update history state [skip ci]"
+              git push origin state/reviewer-radar
+            fi
+          fi
