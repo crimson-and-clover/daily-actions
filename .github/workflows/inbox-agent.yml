@@ -53,11 +53,14 @@ jobs:
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           mkdir -p inbox-agent
+          if [ "$(git branch --show-current)" != "state/inbox-agent" ]; then
+            git checkout --orphan state/inbox-agent
+          fi
           git rm -f inbox-agent/history.json 2>/dev/null || true
           if [ -f inbox-agent/history.enc ]; then
             git add inbox-agent/history.enc
             if ! git diff --staged --quiet; then
               git commit -m "chore(inbox-agent): update encrypted memory state [skip ci]"
-              git push origin state/inbox-agent
+              git push -u origin HEAD:state/inbox-agent
             fi
           fi
