@@ -19,6 +19,7 @@ from inbox_agent.config import (
 )
 from inbox_agent.imap.models import Email
 from inbox_agent.tools import AGENT_TOOLS, ToolContext, execute_tool
+from inbox_agent.tracker import BatchTracker
 from utils.json_parser import parse_json_safely
 from utils.prompt_loader import render_prompt_template
 from utils.timezone import get_bjt_date_str, get_bjt_weekday_str
@@ -97,6 +98,7 @@ class AgentEngine:
         context: ToolContext,
         user_email: str = "",
         max_turns: int = MAX_AGENT_TURNS,
+        tracker: BatchTracker | None = None,
     ) -> str:
         """
         单批次独立 ReAct 会话运行 (纯净 Email 强类型实体模型)：
@@ -105,7 +107,11 @@ class AgentEngine:
         3. 渲染 System 与 User Prompts 开启全新上下文
         4. 进行 ReAct 多轮工具调用闭环与保活
         5. 严格按实际处置结果持久化已处理状态至 memory
+        6. 若传入 tracker，则同步收集处置决策与报表数据
         """
+        if tracker:
+            tracker.register_batch_emails(batch_emails)
+
         # 挂载当前批次邮件字典列表至 ToolContext 供各工具即时访问与元数据提取
         context.current_emails = [e.to_dict() for e in batch_emails]
         memory = context.memory
@@ -218,6 +224,7 @@ class AgentEngine:
                     if fn_name == "apply_labels":
                         adds = parsed_args.get("add", [])
                         removes = parsed_args.get("remove", [])
+                        tldr = parsed_args.get("tldr", "")
                         for u in affected_uids:
                             try:
                                 u_int = int(u)
@@ -231,6 +238,27 @@ class AgentEngine:
                                         msg_id_spam_map[m_id] = False
                             except (ValueError, TypeError):
                                 continue
+
+                        if tracker:
+                            valid_uids: list[int] = []
+                            for u in affected_uids:
+                                try:
+                                    valid_uids.append(int(u))
+                                except (ValueError, TypeError):
+                                    pass
+                            tracker.record_labels(
+                                uids=valid_uids,
+                                add=adds,
+                                remove=removes,
+                                tldr=tldr,
+                                current_code=context.current_code,
+                            )
+                    elif fn_name == "create_calendar_event" and tracker:
+                        if tool_result.get("schedule"):
+                            tracker.record_schedule(tool_result["schedule"])
+                    elif fn_name == "create_email_draft" and tracker:
+                        if tool_result.get("draft"):
+                            tracker.record_draft(tool_result["draft"])
 
                 messages.append({
                     "role": "tool",
