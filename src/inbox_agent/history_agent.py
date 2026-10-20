@@ -12,7 +12,9 @@ Inbox History Agent (收件箱历史邮件归档与清理智能体)
 4. 与主 agent 共享状态，状态经过 Fernet AES 加密安全保存
 """
 
+import email.utils
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 from inbox_agent.classifier import classify_history_email
@@ -43,7 +45,9 @@ def main():
     repo = MessageRepo(conn)
     label_service = LabelService(conn)
 
-    print(f"[IMAP] 正在连接 Gmail 检查早于 {PRUNE_DAYS} 天的历史邮件 (旧 -> 新)...")
+    cutoff_dt = now_dt - timedelta(days=PRUNE_DAYS)
+    cutoff_date_str = cutoff_dt.strftime("%Y-%m-%d")
+    print(f"[IMAP] 正在连接 Gmail 检查早于 {PRUNE_DAYS} 天 (截止 {cutoff_date_str}) 的历史邮件 (旧 -> 新)...")
     try:
         conn.connect()
     except Exception as e:
@@ -51,15 +55,35 @@ def main():
         sys.exit(1)
 
     try:
-        # 严格按最旧到较新抓取未处理历史邮件，最大 100 封
+        # 1. 服务端协议层过滤：严格按 BEFORE 截止日期 + 最旧到较新抓取未处理历史邮件，最大 100 封
         fetched_emails = repo.fetch_emails(
             code="inbox",
+            criteria=["BEFORE", cutoff_dt.date()],
             limit=100,
             reverse=False,
             is_processed_func=history_memory.is_processed,
         )
-        raw_old_emails = [e.to_dict() for e in fetched_emails]
-        print(f"[IMAP] 抓取到待研判历史邮件: {len(raw_old_emails)} 封")
+        # 2. 应用层安全护栏双重校验：确保邮件发送日期绝对早于截止时间，杜绝服务端时区/解析差异导致的误伤
+        raw_old_emails = []
+        for e in fetched_emails:
+            e_dict = e.to_dict()
+            date_str = e_dict.get("date", "")
+            try:
+                msg_dt = email.utils.parsedate_to_datetime(date_str)
+                # 统一时区进行防御性比对
+                if msg_dt.tzinfo is not None and cutoff_dt.tzinfo is not None:
+                    is_older = msg_dt < cutoff_dt
+                else:
+                    is_older = msg_dt.replace(tzinfo=None) < cutoff_dt.replace(tzinfo=None)
+                if not is_older:
+                    print(f"[Safety Warning] 发现晚于 90 天阈值的邮件，已安全拦截跳过: '{e_dict.get('subject')}' (日期: {date_str})")
+                    continue
+            except Exception:
+                # 无法解析日期时由于已有 IMAP BEFORE 过滤，保留处理
+                pass
+            raw_old_emails.append(e_dict)
+
+        print(f"[IMAP] 抓取并核验待研判历史邮件: {len(raw_old_emails)} 封")
     except Exception as e:
         print(f"[IMAP Fatal Error] 获取历史邮件异常: {e}", file=sys.stderr)
         conn.close()
@@ -180,7 +204,7 @@ def main():
             notif_archived_count=notif_archived_count,
             promo_archived_count=promo_archived_count,
             gen_archived_count=gen_archived_count,
-            kept_count=len(kept_items),
+            kept_items=kept_items,
             total_history_cleaned=history_memory.pruned_count,
         )
         subject = f"[Inbox Agent] {date_str} 历史邮件清理报告: 处理{processed_count}封 (删除{deleted_count} | 归档{notif_archived_count + promo_archived_count + gen_archived_count} | 保留{len(kept_items)})"
