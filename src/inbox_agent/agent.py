@@ -18,6 +18,7 @@ from pathlib import Path
 
 from inbox_agent.classifier import classify_email
 from inbox_agent.config import (
+    BATCH_SIZE,
     DEEPSEEK_API_KEY,
     GMAIL_APP_PASS,
     GMAIL_USER,
@@ -96,8 +97,7 @@ def main():
     systems_moved_count = 0
     spams_moved_count = 0
 
-    # 分批执行收件箱新邮件研判与分流 (每批 10 封，边研判边执行并即时持久化)
-    BATCH_SIZE = 10
+    # 分批执行收件箱新邮件研判与分流 (边研判边执行并即时持久化)
     total_unprocessed = len(unprocessed_emails)
     total_batches = (total_unprocessed + BATCH_SIZE - 1) // BATCH_SIZE if total_unprocessed > 0 else 0
 

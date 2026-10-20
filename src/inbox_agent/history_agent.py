@@ -19,6 +19,7 @@ from pathlib import Path
 
 from inbox_agent.classifier import classify_history_email
 from inbox_agent.config import (
+    BATCH_SIZE,
     DEEPSEEK_API_KEY,
     GMAIL_APP_PASS,
     GMAIL_USER,
@@ -94,8 +95,7 @@ def main():
         conn.close()
         return
 
-    # 分批执行配置 (每 10 封为一个 batch，边研判边执行并即时持久化)
-    BATCH_SIZE = 10
+    # 分批执行配置 (边研判边执行并即时持久化)
     total_emails = len(raw_old_emails)
     total_batches = (total_emails + BATCH_SIZE - 1) // BATCH_SIZE
     print(f"[AI 研判] 开始分批分析 {total_emails} 封收件箱历史邮件 (每批 {BATCH_SIZE} 封，共 {total_batches} 批，边研判边转移)...")
