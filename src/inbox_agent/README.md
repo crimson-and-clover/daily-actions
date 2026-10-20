@@ -41,7 +41,7 @@
 | 组件脚本 | 对应工作流 | 调度周期 (北京时间) | 职能定义 |
 | :--- | :--- | :--- | :--- |
 | **`agent.py`** | `.github/workflows/inbox-agent.yml` | 每日 08:10 / 13:10 / 20:10 | **日常实时分流**：10 封一组 ReAct 决策，提炼日程待办与 DDL，将推广归档至 `商业推广`，通知归档至 `系统通知`，恶意垃圾移至 `[Gmail]/Spam`，分批复核垃圾箱误杀。 |
-| **`history_agent.py`** | `.github/workflows/inbox-history-agent.yml` | 每日 03:25 (避峰) | **90天历史积压归档**：从最旧到较新按批次扫描超过 90 天的历史邮件，AI 研判后移入 Trash 或对应归档目录。 |
+| **`history_agent.py`** | `.github/workflows/inbox-history-agent.yml` | *已暂停调度 (暂时停用)* | **90天历史积压归档**：从最旧到较新按批次扫描超过 90 天的历史邮件，AI 研判后移入 Trash 或对应归档目录。 |
 
 ---
 
