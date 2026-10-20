@@ -4,6 +4,7 @@ Inbox Agent 邮件智能分流与结构化解析模块
 """
 
 import sys
+from email.utils import parseaddr
 from pathlib import Path
 
 from openai import OpenAI
@@ -41,11 +42,15 @@ def classify_email(email_item: dict, api_key: str, my_email: str = "") -> dict:
     from_addr_lower = from_addr.lower()
     subject_lower = subject.lower()
 
+    # 提取真实发件人邮箱地址与域名，杜绝显示名伪造 (如 "security@github.com" <evil@attacker.example>)
+    sender_real_addr = parseaddr(from_addr)[1].lower()
+    sender_domain = sender_real_addr.rsplit("@", 1)[-1] if "@" in sender_real_addr else ""
+
     # 判定是否为本人或系统自发通知
     is_from_me = False
-    if my_email_lower and (my_email_lower in from_addr_lower):
+    if my_email_lower and (my_email_lower == sender_real_addr or my_email_lower in from_addr_lower):
         is_from_me = True
-    elif any(sender_sig in from_addr_lower for sender_sig in ["daily actions", "@github.com", "notifications@github.com"]):
+    elif "daily actions" in from_addr_lower or sender_domain == "github.com" or sender_domain.endswith(".github.com"):
         is_from_me = True
 
     # 判定是否属于内部已知任务前缀
@@ -125,11 +130,11 @@ def classify_email(email_item: dict, api_key: str, my_email: str = "") -> dict:
                 )
         else:
             print(
-                f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次未能解析为合法分类 JSON，准备重试... 原始内容: {content}",
+                f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次未能解析为合法分类 JSON，准备重试... 原始内容: {content[:200]}",
                 file=sys.stderr,
             )
 
-    raise RuntimeError(f"[Classifier Fatal] 大模型返回内容重试 {MAX_CLASSIFY_RETRIES} 次后仍无法解析为合法分类 JSON: {last_content}")
+    raise RuntimeError(f"[Classifier Fatal] 大模型返回内容重试 {MAX_CLASSIFY_RETRIES} 次后仍无法解析为合法分类 JSON: {last_content[:200]}")
 
 
 def build_historical_system_prompt(current_date: str, current_weekday: str) -> str:
@@ -210,8 +215,8 @@ def classify_history_email(email_item: dict, api_key: str, my_email: str = "") -
                 )
         else:
             print(
-                f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次历史决策未能解析为合法 JSON，准备重试... 原始内容: {content}",
+                f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次历史决策未能解析为合法 JSON，准备重试... 原始内容: {content[:200]}",
                 file=sys.stderr,
             )
 
-    raise RuntimeError(f"[Classifier Fatal] 大模型返回内容重试 {MAX_CLASSIFY_RETRIES} 次后仍无法解析为合法历史处置决策 JSON: {last_content}")
+    raise RuntimeError(f"[Classifier Fatal] 大模型返回内容重试 {MAX_CLASSIFY_RETRIES} 次后仍无法解析为合法历史处置决策 JSON: {last_content[:200]}")
