@@ -21,11 +21,12 @@ LABEL_SPECS: dict[str, LabelSpec] = {
     "finance_banking": LabelSpec(code="finance_banking", label_name="对账单", folder_name="对账单"),
 }
 
-# 构建从 Gmail 原生标签名到系统业务代码的反向映射表
-LABEL_TO_CODE_MAP: dict[str, str] = {
-    spec.label_name.lower(): code for code, spec in LABEL_SPECS.items()
-}
-LABEL_TO_CODE_MAP.update({code.lower(): code for code in LABEL_SPECS})
+# 构建从 Gmail 原生标签名与文件夹名到系统业务代码的反向映射表
+LABEL_TO_CODE_MAP: dict[str, str] = {}
+for code, spec in LABEL_SPECS.items():
+    LABEL_TO_CODE_MAP[spec.label_name.lower()] = code
+    LABEL_TO_CODE_MAP[spec.folder_name.lower()] = code
+    LABEL_TO_CODE_MAP[code.lower()] = code
 
 
 def labels_to_codes(labels: Sequence[str]) -> list[str]:

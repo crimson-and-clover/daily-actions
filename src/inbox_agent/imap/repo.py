@@ -73,9 +73,13 @@ class MessageRepo:
                 utf7_decode(lbl) if isinstance(lbl, bytes) else str(lbl)
                 for lbl in raw_labels
             ]
+            current_spec = LABEL_SPECS.get(code)
+            if current_spec and current_spec.label_name not in labels:
+                labels.insert(0, current_spec.label_name)
+
             codes = labels_to_codes(labels)
-            if not codes and code in LABEL_SPECS:
-                codes = [code]
+            if current_spec and current_spec.code not in codes:
+                codes.insert(0, current_spec.code)
 
             emails.append(
                 Email(
@@ -229,9 +233,13 @@ class MessageRepo:
                 utf7_decode(lbl) if isinstance(lbl, bytes) else str(lbl)
                 for lbl in raw_labels
             ]
+            current_spec = LABEL_SPECS.get(code)
+            if current_spec and current_spec.label_name not in labels:
+                labels.insert(0, current_spec.label_name)
+
             codes = labels_to_codes(labels)
-            if not codes and code in LABEL_SPECS:
-                codes = [code]
+            if current_spec and current_spec.code not in codes:
+                codes.insert(0, current_spec.code)
 
             emails.append(
                 Email(
