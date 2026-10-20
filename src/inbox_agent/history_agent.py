@@ -180,7 +180,7 @@ def main():
             notif_archived_count=notif_archived_count,
             promo_archived_count=promo_archived_count,
             gen_archived_count=gen_archived_count,
-            kept_count=len(kept_items),
+            kept_items=kept_items,
             total_history_cleaned=history_memory.pruned_count,
         )
         subject = f"[Inbox Agent] {date_str} 历史邮件清理报告: 处理{processed_count}封 (删除{deleted_count} | 归档{notif_archived_count + promo_archived_count + gen_archived_count} | 保留{len(kept_items)})"

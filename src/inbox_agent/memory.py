@@ -269,9 +269,7 @@ class InboxMemory:
             return False
 
         initial_len = len(self.data.active_schedules)
-        self.data.active_schedules = [
-            item for item in self.data.active_schedules if item.schedule_id != target_id
-        ]
+        self.data.active_schedules = [item for item in self.data.active_schedules if item.schedule_id != target_id]
         return len(self.data.active_schedules) < initial_len
 
     def remove_schedules_by_message_id(self, message_id: str) -> list[dict]:
@@ -323,6 +321,16 @@ class HistoryMemory:
     def record_pruned(self, count: int):
         """累加清理统计"""
         self.data.total_pruned_90d += count
+
+    @property
+    def pruned_count(self) -> int:
+        """获取累计清理的90天老邮件总数"""
+        return self.data.total_pruned_90d
+
+    @property
+    def total_pruned(self) -> int:
+        """获取累计清理的90天老邮件总数"""
+        return self.data.total_pruned_90d
 
     def save(self):
         """保存历史清理记忆状态"""

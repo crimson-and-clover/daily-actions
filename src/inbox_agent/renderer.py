@@ -50,6 +50,7 @@ def render_history_email_report(
     promo_archived_count: int,
     gen_archived_count: int,
     kept_items: list,
+    total_history_cleaned: int = 0,
 ) -> str:
     """渲染历史邮件整理汇报 HTML (使用独立 history.html 模板)"""
     return render_html_template(
@@ -62,4 +63,5 @@ def render_history_email_report(
         promo_archived_count=promo_archived_count,
         gen_archived_count=gen_archived_count,
         kept_items=kept_items or [],
+        total_history_cleaned=total_history_cleaned,
     )
