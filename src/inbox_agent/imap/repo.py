@@ -8,8 +8,10 @@ from collections.abc import Callable
 from email import policy
 from typing import Any
 
+from imapclient.imap_utf7 import decode as utf7_decode
+
 from inbox_agent.imap.connection import ImapConnection
-from inbox_agent.imap.labels import LABEL_SPECS
+from inbox_agent.imap.labels import LABEL_SPECS, labels_to_codes
 from inbox_agent.imap.models import Email
 from inbox_agent.imap.parser import parse_email_message
 
@@ -55,8 +57,8 @@ class MessageRepo:
             if message_id and is_processed_func and is_processed_func(message_id):
                 continue
 
-            # 2. 抓取完整邮件报文，失败直接 Fail-Fast
-            full_fetch = client.fetch([uid], [b"RFC822"])
+            # 2. 抓取完整邮件报文与 Gmail 原生标签，失败直接 Fail-Fast
+            full_fetch = client.fetch([uid], [b"RFC822", b"X-GM-LABELS"])
             if not full_fetch or uid not in full_fetch:
                 raise RuntimeError(f"未能抓取 UID {uid} 的 RFC822 完整报文")
 
@@ -65,6 +67,19 @@ class MessageRepo:
                 raise RuntimeError(f"UID {uid} 的 RFC822 报文内容为空")
 
             parsed = parse_email_message(raw_email_bytes)
+
+            raw_labels = full_fetch[uid].get(b"X-GM-LABELS", ())
+            labels: list[str] = [
+                utf7_decode(lbl) if isinstance(lbl, bytes) else str(lbl)
+                for lbl in raw_labels
+            ]
+            current_spec = LABEL_SPECS.get(code)
+            if current_spec and current_spec.label_name not in labels:
+                labels.insert(0, current_spec.label_name)
+
+            codes = labels_to_codes(labels)
+            if current_spec and current_spec.code not in codes:
+                codes.insert(0, current_spec.code)
 
             emails.append(
                 Email(
@@ -79,7 +94,8 @@ class MessageRepo:
                     raw_html=parsed["raw_html"],
                     attachments=parsed["attachments"],
                     unsubscribe_link=parsed["unsubscribe_link"],
-                    folder=folder,
+                    labels=labels,
+                    codes=codes,
                 )
             )
 
@@ -131,6 +147,43 @@ class MessageRepo:
             "truncated": truncated,
         }
 
+    def get_email_by_message_id(
+        self,
+        message_id: str,
+        code: str = "inbox",
+        max_length: int = 4000,
+    ) -> dict[str, Any] | None:
+        """根据 RFC 822 Message-ID 查找并读取邮件 (双引擎支持: Gmail 原生语法 + IMAP RFC 3501 标准语法)"""
+        clean_id = (message_id or "").strip()
+        if not clean_id:
+            return None
+
+        folder = LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code
+        self.connection.select_folder(folder)
+        client = self.connection.client
+
+        # 1. 优先尝试 Gmail X-GM-EXT-1 专属扩展语法 (毫秒级全邮箱检索)
+        uids: list[int] = []
+        try:
+            uids = client.gmail_search(f"rfc822msgid:{clean_id.strip('<>')}")
+        except Exception:
+            pass
+
+        # 2. 回退至标准 IMAP RFC 3501 语法: HEADER Message-ID 检索 (通用各大邮件服务商)
+        if not uids:
+            try:
+                uids = client.search([b"HEADER", b"Message-ID", clean_id.encode("utf-8")])
+                if not uids and not clean_id.startswith("<"):
+                    wrapped_id = f"<{clean_id}>"
+                    uids = client.search([b"HEADER", b"Message-ID", wrapped_id.encode("utf-8")])
+            except Exception:
+                pass
+
+        if not uids:
+            return None
+
+        return self.read_email_content(email_uid=uids[0], code=code, max_length=max_length)
+
     def search_emails(
         self,
         query: str = "",
@@ -138,8 +191,8 @@ class MessageRepo:
         unread_only: bool = False,
         sender: str = "",
         limit: int = 10,
-    ) -> list[dict[str, Any]]:
-        """按关键词、发件人、未读状态检索邮件元数据 (Fail-Fast)"""
+    ) -> list[Email]:
+        """按关键词、发件人、未读状态检索邮件，返回完整的 Email 领域实体列表 (Fail-Fast)"""
         folder = LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code
         self.connection.select_folder(folder)
         client = self.connection.client
@@ -165,49 +218,45 @@ class MessageRepo:
             return []
 
         selected_uids = list(reversed(uids))[:limit]
-        fetch_data = client.fetch(selected_uids, [b"ENVELOPE", b"BODY.PEEK[TEXT]<0.600>"])
-
-        results: list[dict[str, Any]] = []
+        emails: list[Email] = []
         for uid in selected_uids:
-            if uid not in fetch_data:
+            fetch_data = client.fetch([uid], [b"RFC822", b"X-GM-LABELS"])
+            if not fetch_data or uid not in fetch_data:
                 continue
-            item = fetch_data[uid]
-            env = item.get(b"ENVELOPE")
-            raw_snip = item.get(b"BODY[TEXT]<0>", b"")
+            raw_email_bytes = fetch_data[uid].get(b"RFC822", b"")
+            if not raw_email_bytes:
+                continue
+            parsed = parse_email_message(raw_email_bytes)
 
-            clean_snip = (
-                raw_snip.decode("utf-8", errors="ignore")
-                .replace("\r", " ")
-                .replace("\n", " ")
-                .strip()[:200]
+            raw_labels = fetch_data[uid].get(b"X-GM-LABELS", ())
+            labels: list[str] = [
+                utf7_decode(lbl) if isinstance(lbl, bytes) else str(lbl)
+                for lbl in raw_labels
+            ]
+            current_spec = LABEL_SPECS.get(code)
+            if current_spec and current_spec.label_name not in labels:
+                labels.insert(0, current_spec.label_name)
+
+            codes = labels_to_codes(labels)
+            if current_spec and current_spec.code not in codes:
+                codes.insert(0, current_spec.code)
+
+            emails.append(
+                Email(
+                    uid=uid,
+                    message_id=parsed["message_id"],
+                    subject=parsed["subject"],
+                    from_addr=parsed["from_addr"],
+                    to_addr=parsed["to_addr"],
+                    date=parsed["date"],
+                    snippet=parsed["body"][:1000],
+                    body=parsed["body"],
+                    raw_html=parsed["raw_html"],
+                    attachments=parsed["attachments"],
+                    unsubscribe_link=parsed["unsubscribe_link"],
+                    labels=labels,
+                    codes=codes,
+                )
             )
 
-            subject = "无主题"
-            from_addr = "未知发件人"
-            date_str = ""
-            message_id = ""
-
-            if env:
-                date_str = str(env.date or "")
-                message_id = env.message_id.decode("ascii", errors="ignore") if env.message_id else ""
-                if env.subject:
-                    subject = email.header.make_header(
-                        email.header.decode_header(env.subject.decode("latin1", errors="ignore"))
-                    ).__str__()
-                if env.from_ and len(env.from_) > 0:
-                    addr = env.from_[0]
-                    mailbox = addr.mailbox.decode("ascii", errors="ignore") if addr.mailbox else ""
-                    host = addr.host.decode("ascii", errors="ignore") if addr.host else ""
-                    from_addr = f"{mailbox}@{host}" if host else mailbox
-
-            results.append({
-                "uid": uid,
-                "folder": folder,
-                "subject": subject,
-                "from_addr": from_addr,
-                "date": date_str,
-                "message_id": message_id,
-                "snippet": clean_snip,
-            })
-
-        return results
+        return emails

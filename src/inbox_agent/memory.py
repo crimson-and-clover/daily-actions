@@ -164,8 +164,8 @@ class InboxMemory:
                     self.data.spam_message_ids = self.data.spam_message_ids[-2000:]
                 self.data.total_spam_filtered += 1
 
-    def add_schedule(self, schedule_item: ScheduleItem | dict):
-        """将包含具体日期 (event_date) 的日程保存到待办日历池中，按 schedule_id 或 RFC 822 Message-ID 覆盖去重"""
+    def add_schedule(self, schedule_item: ScheduleItem | dict) -> ScheduleItem | None:
+        """将包含具体日期 (event_date) 的日程保存到待办日历池中，按 schedule_id 或 (message_id + title + event_date) 覆盖去重"""
         if isinstance(schedule_item, dict):
             title = schedule_item.get("title") or schedule_item.get("subject") or "未命名日程"
             payload = {**schedule_item, "title": title}
@@ -175,14 +175,19 @@ class InboxMemory:
 
         event_date = item.event_date.strip()
         if not event_date:
-            return
+            return None
 
-        # 依据 schedule_id 或 RFC 822 Message-ID 或 (title + event_date) 查重与就地覆盖更新
+        # 依据 schedule_id 或 (message_id + title + event_date) 查重与就地覆盖更新
         for existing in self.data.active_schedules:
             match = False
             if item.schedule_id and existing.schedule_id == item.schedule_id:
                 match = True
-            elif item.message_id and existing.message_id == item.message_id:
+            elif (
+                item.message_id
+                and existing.message_id == item.message_id
+                and existing.title == item.title
+                and existing.event_date == event_date
+            ):
                 match = True
             elif not item.message_id and existing.title == item.title and existing.event_date == event_date:
                 match = True
@@ -199,9 +204,10 @@ class InboxMemory:
                 existing.advance_days = item.advance_days
                 existing.priority = item.priority
                 existing.updated_at = get_now_bjt().strftime("%Y-%m-%d %H:%M:%S")
-                return
+                return existing
 
         self.data.active_schedules.append(item)
+        return item
 
     def get_due_schedules(self, today_str: str) -> list[dict]:
         """

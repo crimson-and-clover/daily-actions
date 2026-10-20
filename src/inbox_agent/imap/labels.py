@@ -21,6 +21,23 @@ LABEL_SPECS: dict[str, LabelSpec] = {
     "finance_banking": LabelSpec(code="finance_banking", label_name="对账单", folder_name="对账单"),
 }
 
+# 构建从 Gmail 原生标签名与文件夹名到系统业务代码的反向映射表
+LABEL_TO_CODE_MAP: dict[str, str] = {}
+for code, spec in LABEL_SPECS.items():
+    LABEL_TO_CODE_MAP[spec.label_name.lower()] = code
+    LABEL_TO_CODE_MAP[spec.folder_name.lower()] = code
+    LABEL_TO_CODE_MAP[code.lower()] = code
+
+
+def labels_to_codes(labels: Sequence[str]) -> list[str]:
+    """将 Gmail 原生标签列表解析并映射为业务规范代码列表 (codes)"""
+    codes: list[str] = []
+    for lbl in labels:
+        c = LABEL_TO_CODE_MAP.get(lbl.strip().lower())
+        if c and c not in codes:
+            codes.append(c)
+    return codes
+
 
 class LabelService:
     """管理邮件的 Gmail 标签增删与分类 (基于 X-GM-LABELS，UID 统一为 int，Fail-Fast)"""
