@@ -7,12 +7,13 @@ import json
 import re
 
 
-def parse_json_safely(raw_text: str) -> dict | list | None:
+def parse_json_safely(raw_text: str, strict: bool = False) -> dict | list | None:
     """
     从大模型原始回复中安全提取并解析合法 JSON：
     1. 优先尝试直接在最外层花括号/方括号之间截取并解析；
     2. 若失败，尝试清洗 Markdown 代码块标记 (```json ... ```)；
-    3. 杜绝解析异常导致程序崩溃，解析失败返回 None。
+    3. 支持 strict=False 以允许字符串内部包含未转义的控制字符与换行；
+    4. 杜绝解析异常导致程序崩溃，解析失败返回 None。
     """
     if not raw_text or not isinstance(raw_text, str):
         return None
@@ -25,7 +26,7 @@ def parse_json_safely(raw_text: str) -> dict | list | None:
     if start != -1 and end != -1 and end > start:
         candidate = raw_text[start : end + 1]
         try:
-            return json.loads(candidate)
+            return json.loads(candidate, strict=strict)
         except Exception:
             pass
 
@@ -38,12 +39,19 @@ def parse_json_safely(raw_text: str) -> dict | list | None:
     if start != -1 and end != -1 and end > start:
         candidate = cleaned[start : end + 1]
         try:
-            return json.loads(candidate)
+            return json.loads(candidate, strict=strict)
         except Exception:
             pass
 
-    # 3. 兜底尝试整个串直接解析（支持数组等）
+    # 3. 尝试容错去除尾随逗号 (trailing commas)
     try:
-        return json.loads(raw_text)
+        fixed = re.sub(r",\s*([\}\]])", r"\1", raw_text)
+        return json.loads(fixed, strict=strict)
+    except Exception:
+        pass
+
+    # 4. 兜底尝试整个串直接解析（支持数组等）
+    try:
+        return json.loads(raw_text, strict=strict)
     except Exception:
         return None

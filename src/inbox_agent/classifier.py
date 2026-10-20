@@ -3,6 +3,7 @@ Inbox Agent 邮件智能分流与结构化解析模块
 利用 DeepSeek 大模型对邮件进行分门别类与关键行动项提取
 """
 
+import sys
 from pathlib import Path
 
 from openai import OpenAI
@@ -13,6 +14,7 @@ from utils.prompt_loader import render_prompt_template
 from utils.timezone import get_bjt_date_str, get_bjt_weekday_str
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "templates" / "prompts"
+MAX_CLASSIFY_RETRIES = 3
 
 
 def build_system_prompt(current_date: str, current_weekday: str) -> str:
@@ -43,7 +45,7 @@ def classify_email(email_item: dict, api_key: str, my_email: str = "") -> dict:
     is_from_me = False
     if my_email_lower and (my_email_lower in from_addr_lower):
         is_from_me = True
-    elif any(sender_sig in from_addr_lower for sender_sig in ["daily actions", "notifications@github.com"]):
+    elif any(sender_sig in from_addr_lower for sender_sig in ["daily actions", "@github.com", "notifications@github.com"]):
         is_from_me = True
 
     # 判定是否属于内部已知任务前缀
@@ -83,39 +85,51 @@ def classify_email(email_item: dict, api_key: str, my_email: str = "") -> dict:
         snippet=snippet,
     )
 
-    resp = client.chat.completions.create(
-        model=DEEPSEEK_MODEL,
-        messages=[
-            {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.1,
-        max_tokens=20000,
-    )
-    content = resp.choices[0].message.content or ""
-    parsed = parse_json_safely(content)
-    if not parsed or "category" not in parsed:
-        raise RuntimeError(f"[Classifier Error] 大模型返回的内容无法解析为合法分类 JSON: {content[:200]}")
+    last_content = ""
+    for attempt in range(1, MAX_CLASSIFY_RETRIES + 1):
+        resp = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=20000,
+        )
+        content = resp.choices[0].message.content or ""
+        last_content = content
+        parsed = parse_json_safely(content, strict=False)
 
-    # 校验并清洗
-    cat = parsed.get("category", "newsletter_system")
-    if cat not in ["schedule", "important", "newsletter_system", "marketing", "spam"]:
-        raise ValueError(f"[Classifier Error] 大模型输出了未知的分类类别: {cat}")
-    parsed["category"] = cat
-    parsed["priority"] = parsed.get("priority", "P2")
-    parsed["tldr"] = parsed.get("tldr", subject[:30]).replace("\n", " ").strip()
-    parsed["action_items"] = parsed.get("action_items", [])
-    parsed["event_time"] = parsed.get("event_time", "")
-    parsed["event_date"] = parsed.get("event_date", "").strip()
-    # 智能提取提前通知天数
-    try:
-        adv = int(parsed.get("advance_days", 0))
-        parsed["advance_days"] = max(0, min(adv, 30))
-    except Exception:
-        parsed["advance_days"] = 3 if cat == "schedule" else 0
-    parsed["reason"] = parsed.get("reason", "")
-    return parsed
+        if isinstance(parsed, dict) and "category" in parsed:
+            cat = parsed.get("category")
+            if cat in ["schedule", "important", "newsletter_system", "marketing", "spam"]:
+                parsed["category"] = cat
+                parsed["priority"] = parsed.get("priority", "P2")
+                parsed["tldr"] = parsed.get("tldr", subject[:30]).replace("\n", " ").strip()
+                parsed["action_items"] = parsed.get("action_items", [])
+                parsed["event_time"] = parsed.get("event_time", "")
+                parsed["event_date"] = parsed.get("event_date", "").strip()
+                # 智能提取提前通知天数
+                try:
+                    adv = int(parsed.get("advance_days", 0))
+                    parsed["advance_days"] = max(0, min(adv, 30))
+                except Exception:
+                    parsed["advance_days"] = 3 if cat == "schedule" else 0
+                parsed["reason"] = parsed.get("reason", "")
+                return parsed
+            else:
+                print(
+                    f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次分类输出未知的类别 '{cat}'，准备重试...",
+                    file=sys.stderr,
+                )
+        else:
+            print(
+                f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次未能解析为合法分类 JSON，准备重试... 原始内容: {content}",
+                file=sys.stderr,
+            )
+
+    raise RuntimeError(f"[Classifier Fatal] 大模型返回内容重试 {MAX_CLASSIFY_RETRIES} 次后仍无法解析为合法分类 JSON: {last_content}")
 
 
 def build_historical_system_prompt(current_date: str, current_weekday: str) -> str:
@@ -159,32 +173,45 @@ def classify_history_email(email_item: dict, api_key: str, my_email: str = "") -
         snippet=snippet,
     )
 
-    resp = client.chat.completions.create(
-        model=DEEPSEEK_MODEL,
-        messages=[
-            {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.1,
-        max_tokens=20000,
-    )
-    content = resp.choices[0].message.content or ""
-    parsed = parse_json_safely(content)
-    if not parsed or "action" not in parsed:
-        raise RuntimeError(f"[Classifier Error] 大模型返回的内容无法解析为合法历史处置决策 JSON: {content[:200]}")
+    last_content = ""
+    for attempt in range(1, MAX_CLASSIFY_RETRIES + 1):
+        resp = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=20000,
+        )
+        content = resp.choices[0].message.content or ""
+        last_content = content
+        parsed = parse_json_safely(content, strict=False)
 
-    act = parsed.get("action", "delete")
-    if act not in ["delete", "archive_notifications", "archive_promotions", "archive_general", "keep_inbox"]:
-        raise ValueError(f"[Classifier Error] 大模型输出了未知的历史处置动作: {act}")
-    parsed["action"] = act
-    parsed["tldr"] = parsed.get("tldr", subject[:30]).replace("\n", " ").strip()
-    parsed["action_items"] = parsed.get("action_items", [])
-    parsed["event_date"] = (parsed.get("event_date") or "").strip()
-    parsed["event_time"] = (parsed.get("event_time") or "").strip()
-    try:
-        parsed["advance_days"] = max(0, min(int(parsed.get("advance_days", 0)), 30))
-    except Exception:
-        parsed["advance_days"] = 0
-    parsed["reason"] = parsed.get("reason", "")
-    return parsed
+        if isinstance(parsed, dict) and "action" in parsed:
+            act = parsed.get("action")
+            if act in ["delete", "archive_notifications", "archive_promotions", "archive_general", "keep_inbox"]:
+                parsed["action"] = act
+                parsed["tldr"] = parsed.get("tldr", subject[:30]).replace("\n", " ").strip()
+                parsed["action_items"] = parsed.get("action_items", [])
+                parsed["event_date"] = (parsed.get("event_date") or "").strip()
+                parsed["event_time"] = (parsed.get("event_time") or "").strip()
+                try:
+                    parsed["advance_days"] = max(0, min(int(parsed.get("advance_days", 0)), 30))
+                except Exception:
+                    parsed["advance_days"] = 0
+                parsed["reason"] = parsed.get("reason", "")
+                return parsed
+            else:
+                print(
+                    f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次历史决策输出未知的动作 '{act}'，准备重试...",
+                    file=sys.stderr,
+                )
+        else:
+            print(
+                f"[Classifier Warning] 第 {attempt}/{MAX_CLASSIFY_RETRIES} 次历史决策未能解析为合法 JSON，准备重试... 原始内容: {content}",
+                file=sys.stderr,
+            )
+
+    raise RuntimeError(f"[Classifier Fatal] 大模型返回内容重试 {MAX_CLASSIFY_RETRIES} 次后仍无法解析为合法历史处置决策 JSON: {last_content}")
