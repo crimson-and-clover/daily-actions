@@ -1,0 +1,2429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 前沿学术研报</title>
+    <!-- KaTeX 数学公式渲染库 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+            onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --primary: #0f172a;
+            --secondary: #334155;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --accent: #2563eb;
+            --score-bg: #f8fafc;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 32px 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 32px 36px 24px 36px;
+            border-bottom: 1px solid var(--border);
+            background: #ffffff;
+        }
+
+        .header-meta {
+            font-size: 11px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header-title {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.02em;
+        }
+
+        .header-desc {
+            margin: 8px 0 0 0;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 36px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .stats-bar strong {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .content {
+            padding: 36px;
+        }
+
+        .track-section {
+            margin-bottom: 44px;
+        }
+
+        .track-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .track-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px;
+            margin-bottom: 22px;
+        }
+
+        .track-title {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: var(--primary);
+            text-transform: uppercase;
+        }
+
+        .track-count {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        .paper-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .paper-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .paper-title {
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.4;
+            margin: 0 0 10px 0;
+        }
+
+        .paper-title a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .paper-title a:hover {
+            color: var(--accent);
+            text-decoration: underline;
+        }
+
+        .paper-meta {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-github {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            text-decoration: none;
+        }
+
+        /* 维度打分栏 (紧凑响应式设计，防止宽度撑爆) */
+        .score-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .score-item {
+            flex: 1 1 auto;
+            min-width: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 6px;
+            border-right: 1px solid #edf2f7;
+        }
+
+        .score-item:last-child {
+            border-right: none;
+        }
+
+        .score-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--muted);
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        .score-val {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 1px;
+            white-space: nowrap;
+        }
+
+        /* 核心白话与输入输出定义模块 */
+        .tldr-box {
+            background: #f8fafc;
+            border-left: 4px solid var(--primary);
+            padding: 12px 16px;
+            border-radius: 0 6px 6px 0;
+            font-size: 14px;
+            color: var(--primary);
+            margin-bottom: 14px;
+            line-height: 1.6;
+        }
+
+        .io-box {
+            background: #fafafa;
+            border: 1px dashed var(--border);
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-size: 13px;
+            color: var(--secondary);
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .io-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .io-label {
+            font-weight: 700;
+            color: var(--muted);
+            min-width: 75px;
+        }
+
+        .section-label {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted);
+            margin: 16px 0 8px 0;
+        }
+
+        .tech-list {
+            margin: 0 0 16px 0;
+            padding-left: 20px;
+            font-size: 13px;
+            color: var(--secondary);
+            line-height: 1.6;
+        }
+
+        .tech-list li {
+            margin-bottom: 8px;
+        }
+
+        .takeaway-box {
+            font-size: 13px;
+            color: var(--secondary);
+            background: #f1f5f9;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+
+        .figures-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin: 14px 0 18px 0;
+        }
+
+        .figure-card {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .figure-img-wrap {
+            background: #ffffff;
+            padding: 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 180px;
+        }
+
+        .figure-img-wrap img {
+            max-width: 100%;
+            max-height: 320px;
+            height: auto;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+
+        .figure-caption {
+            padding: 10px 12px;
+            font-size: 12px;
+            color: var(--secondary);
+            line-height: 1.45;
+            background: #f8fafc;
+            word-break: break-word;
+        }
+
+        .paper-links {
+            display: flex;
+            gap: 14px;
+            font-size: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .paper-links a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .paper-links a:hover {
+            text-decoration: underline;
+        }
+
+        .footer {
+            padding: 24px 36px;
+            border-top: 1px solid var(--border);
+            background: #ffffff;
+            font-size: 12px;
+            color: var(--muted);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="padding: 14px 36px 0 36px; font-size: 13px; color: var(--muted); background: #ffffff;">
+            <a href="../index.html" style="color: var(--accent); text-decoration: none; font-weight: 500;">&larr; 返回论文专区目录</a>
+            <span style="margin: 0 8px; color: var(--border);">|</span>
+            <a href="../../index.html" style="color: var(--muted); text-decoration: none;">知识门户总览</a>
+        </div>
+        <header class="header">
+            <div class="header-meta">前沿技术文献速递 &bull; GITHUB PAGES WEB VERSION</div>
+            <h1 class="header-title">AI 前沿学术研报</h1>
+            <p class="header-desc">自动驾驶感知 &bull; 端到端智驾 &bull; 世界模型 &bull; 具身智能 &bull; 后训练推理</p>
+        </header>
+
+        <div class="stats-bar">
+            <span>日期: <strong>2026-10-26</strong></span>
+            <span>今日精选: <strong>19 篇</strong></span>
+            <span>累计索引: <strong>176 篇</strong></span>
+        </div>
+
+        <main class="content">
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">测试期训练 &amp; 推理扩展 (Test-Time Training / Scaling)</span>
+                    <span class="track-count">3 selected</span>
+                </div>
+
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32046v1" target="_blank">Can Test-Time Memory Evolution Outperform Test-Time Training for Scientific Discovery?</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ UCSB/UC Berkeley</span>
+
+                        <a href="https://github.com/yepengliu/TTME" target="_blank" class="badge badge-github">GitHub 开源</a>
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Yepeng Liu, Shengmai Chen, Xuandong Zhao et al.</span>
+                        <span>arXiv ID: 2610.32046</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">8.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">8.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.0/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文直接研究测试期适应：用非参数记忆演化替代测试期权重更新，属于目标轨道核心问题，并在科学发现搜索中给出量化收益；但任务局限于数学构造，方法创新更多是机制替换与记忆工程，因此创新性未给更高分。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>测试期训练（TTT）是在推理或搜索过程中用反馈在线更新模型权重，以提升科学发现任务表现，但每次更新都会带来额外算力。本文提出测试期记忆演化（TTME）：不改模型权重，而是把搜索中的成功经验与失败教训蒸馏进外部“指南记忆”和“策略记忆”，像不断更新的操作手册与算法套路库，用来指导后续候选程序生成。核心直觉是：把参数更新换成可复用的非参数经验积累，在保持甚至提升发现效果的同时显著降低计算开销。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>任务规格（数学构造目标与验证器）、父程序代码、历史搜索记录（候选程序、评分、执行反馈）</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>新的候选程序代码，供验证器评估其合法性与得分</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>将测试期适应分为权重适应与记忆适应：权重适应更新 $\theta_t$，而 TTME 固定 $\theta_0$，仅更新外部记忆 $\mathcal{M}_{t+1}\leftarrow U_{\mathrm{mem}}(\mathcal{M}_t,\mathcal{D}_t)$。</li>
+                        <li>双记忆结构 $\mathcal{M}_t=(\mathcal{L}_t,\mathcal{S}_t)$：$\mathcal{L}_t$ 存储实现指南，$\mathcal{S}_t$ 存储可复用算法策略，每 $K$ 步从反馈摘要 $r_t$ 中蒸馏更新。</li>
+                        <li>维护时对新指南做匹配、复发计数与时效刷新，并按容量淘汰陈旧条目；策略记忆从得分提升的修改案例中抽取经验笔记并归入策略族。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在五个数学构造任务、两个发现框架和三个模型上，TTME 均优于 TTT，并将 FLOPs 降低 $82.8\%$-$84.6\%$、运行时间降低 $47.7\%$-$58.4\%$。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32046v1/teaser_score_cost.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32046v1/teaser_score_cost.svg" alt="Figure 1 : Best-found scores versus computational cost under the TTT-Discover framework [ 36 ] with Qwen3-8B. The three settings use the same discovery framework, with TTT, with TTME replacing TTT, or with neither method. TTME achieves the best scores at low computational cost across all three tasks." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1 : Best-found scores versus computational cost under the TTT-Discover framework [ 36 ] with Qwen3-8B. The three settings use the same discovery framework, with TTT, with TTME replacing TTT, or with neither method. TTME achieves the best scores at low computational cost across all three tasks.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32046v1/overview.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32046v1/overview.png" alt="Figure 2 : Weight adaptation updates model parameters through test-time RL (top). Memory adaptation updates external memory that conditions generation while keeping model weights fixed (bottom). Both retain the same underlying discovery framework." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2 : Weight adaptation updates model parameters through test-time RL (top). Memory adaptation updates external memory that conditions generation while keeping model weights fixed (bottom). Both retain the same underlying discovery framework.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32046" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32046v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32046v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.23225v1" target="_blank">ReLaDrift: Recurrent Language Generation via Drifting for Test-Time Scaling</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 东京科学大学/AIST/NII</span>
+
+                        <a href="https://github.com/Yuki-Ots/ReLaDrift" target="_blank" class="badge badge-github">GitHub 开源</a>
+
+                        <span>发表日期: 2026-10-16</span>
+                        <span>作者: Yuki Otsuka, Daisuke Oba, Naoaki Okazaki</span>
+                        <span>arXiv ID: 2610.23225</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">9.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.6/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">7.0/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.0/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文直接研究推理期计算扩展：用共享 Drifting 模型的循环潜空间修正，实现推理调用次数与生成质量之间的可控权衡，属于目标轨道核心机制；但并非测试期权重训练，且实验集中在 Sudoku/GSM8K 小规模任务，机构权威度中等。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>一步式 Drifting Model 能并行生成文本，但把它反复调用并不会让结果变好，因此缺少“多花推理算力换更高质量”的机制。ReLaDrift 让同一个 Drifting 网络在连续潜空间中循环工作：第一轮把噪声变成初稿，后续轮次不断修正上一版草稿，最终只解码一次。所谓“漂移场”，可以理解成训练时的一股校正力：它把生成样本往真实样本方向拉，同时把生成样本彼此推开，使生成分布逐步贴近真实分布；训练时只让最后一轮反传梯度，使测试时可以自由增加循环轮数来换取更好结果。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>问题提示的词元序列（数独题面或数学题）经冻结编码器得到的连续潜变量，以及初始噪声；每轮修正还接收上一轮草稿潜变量和轮次索引。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>最终连续潜变量序列，经冻结解码器并行映射为答案词元序列（数独解或数学推理程序）。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>共享 Drifting 网络 $f_\theta$ 将噪声或上一轮草稿映射为下一轮连续潜变量草稿，所有修正轮共享参数，仅由轮次索引选择输入/输出投影。</li>
+                        <li>训练时采样轮数 $N\sim\mathrm{Uniform}\{1,\ldots,R_{\max}\}$，仅在最终轮计算 drifting loss $\mathcal{L}_{\mathrm{drift}}$，并对前序轮 stop-gradient，避免多轮反传。</li>
+                        <li>漂移场 $V_{p,q_\theta}(x)=V_p^+(x)-V_{q_\theta}^-(x)$ 对真实样本吸引、对生成样本排斥；推理时不需要漂移场，只重复前向。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在 Sudoku Hard 与 GSM8K 上，ReLaDrift 的精度随 NFE 增加持续提升，并在相同推理预算下与扩散/流式语言模型相当或更优；直接迭代一步 Drifting Model 则基本不随轮数提升。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.23225v1/nfe_teaser_column.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.23225v1/nfe_teaser_column.svg" alt="Figure 1: Accuracy vs. the number of function evaluations (NFE) on Sudoku Hard (top) and GSM8K (bottom). Results use a single generation trajectory and EMA weights, with mean ± \pm standard deviation over three seeds for Sudoku. Models are evaluated at 20,000 updates (Sudoku) and 250,000 updates (GSM8K); sampling settings are detailed in Tables 1 and 3 ." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: Accuracy vs. the number of function evaluations (NFE) on Sudoku Hard (top) and GSM8K (bottom). Results use a single generation trajectory and EMA weights, with mean ± \pm standard deviation over three seeds for Sudoku. Models are evaluated at 20,000 updates (Sudoku) and 250,000 updates (GSM8K); sampling settings are detailed in Tables 1 and 3 .</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.23225v1/reladrift_overview.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.23225v1/reladrift_overview.svg" alt="Figure 2: ReLaDrift in the source formulation. Round 0 (Initial) transports the noise ϵ \epsilon to the first draft d 1 d_{1} through the input projection W noise W_{\mathrm{noise}} , and every later round (Refine) transports the current draft through W draft W_{\mathrm{draft}} ; all rounds share the network f θ f_{\theta} and receive the prompt latent P P and the round index r r (Sec. 4.2 ). The frozen decoder is applied once to the last draft d N d_{N} ; at test time, the number of rounds N N is the NFE and may exceed the training depth R max R_{\max} (Sec. 4.4 ). The marks sg \operatorname{sg} and the loss ℒ \mathcal{L} apply only during training, where N = R ∼ Uniform ⁡ { 1 , … , R max } N=R\sim\operatorname{Uniform}\{1,\ldots,R_{\max}\} and the drafts that enter a round are treated as constants, so the loss backpropagates through the terminal round only (Sec. 4.3 ). The positives and the negatives of the loss are not shown." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2: ReLaDrift in the source formulation. Round 0 (Initial) transports the noise ϵ \epsilon to the first draft d 1 d_{1} through the input projection W noise W_{\mathrm{noise}} , and every later round (Refine) transports the current draft through W draft W_{\mathrm{draft}} ; all rounds share the network f θ f_{\theta} and receive the prompt latent P P and the round index r r (Sec. 4.2 ). The frozen decoder is applied once to the last draft d N d_{N} ; at test time, the number of rounds N N is the NFE and may exceed the training depth R max R_{\max} (Sec. 4.4 ). The marks sg \operatorname{sg} and the loss ℒ \mathcal{L} apply only during training, where N = R ∼ Uniform ⁡ { 1 , … , R max } N=R\sim\operatorname{Uniform}\{1,\ldots,R_{\max}\} and the drafts that enter a round are treated as constants, so the loss backpropagates through the terminal round only (Sec. 4.3 ). The positives and the negatives of the loss are not shown.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.23225" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.23225v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.23225v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.23223v1" target="_blank">Process Reward Modeling with Reliability- and Conservatism-Aware Bayesian Belief</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ CityUHK / SII</span>
+
+                        <a href="https://github.com/JinYuanLi0012/Beta-Binomial-PRM.git" target="_blank" class="badge badge-github">GitHub 开源</a>
+
+                        <span>发表日期: 2026-10-16</span>
+                        <span>作者: Zhongjian Qiao, Zhixiang Zhou, Jiafei Lyu et al.</span>
+                        <span>arXiv ID: 2610.23223</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">8.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.2/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">7.6/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.1/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文直接面向PRM在测试时扩展中的奖励不准问题，联合建模PRM不确定性与策略不确定性，属于过程奖励与推理扩展的核心机制；但它不是TTT或o1式搜索算法本身，机构组合强但非最顶级，故相关性给8.5而非满分。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>过程奖励模型（PRM）是给大模型每一步推理打分的“过程裁判”，用于测试时扩展，但它常打分不准：一是裁判自己没学好（PRM不确定性），二是训练采样策略与测试策略不一致，导致系统性高估（策略不确定性）。论文把真实奖励看成未知随机变量，用多个奖励模型组成“专家团”近似所有可能奖励，并维护每个专家可信度的概率分布（贝叶斯信念）：谁更能解释监督数据谁权重高（可靠性感知），同时把权重往低奖励倾斜以抵消高估（保守性校准），最后用加权期望作为过程奖励。核心直觉是既承认裁判会犯错，又对策略变化造成的乐观偏差做保守校正。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>多模态推理题目（图像加问题文本）及模型已生成的逐步推理前缀 $c_t$；训练阶段还输入由 rollout 策略采样得到的蒙特卡洛成功率监督。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>对每个推理前缀输出一个 $[0,1]$ 的过程奖励（后续成功概率估计），用于 Best-of-N 或实例自适应测试时扩展中的候选路径选择与加权。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>将测试策略下的PRM误差分解为 $r_\theta(c_t)-q_t^{\pi_1}$ 的PRM不确定性与 $q_t^{\pi_1}-q_t^{\pi_2}$ 的策略不确定性，前者源于监督不足与训练不完美，后者源于训练采样策略 $\pi_1$ 与测试策略 $\pi_2$ 失配。</li>
+                        <li>用奖励集成 $\{r_{\theta_i}\}_{i=1}^{M}$ 离散化奖励假设空间，以权重 $w_i$ 表示贝叶斯信念；可靠性感知更新通过ELBO训练摊销信念网络，使更能解释监督数据 $\mathcal{D}_{\text{train}}$ 的集成成员获得更高权重。</li>
+                        <li>保守性感知校准将信念向低奖励重新加权，最终以 $\mathbb{E}_{w}[r_\theta(c_t)]$ 输出过程奖励，从而抑制策略失配导致的系统性奖励高估。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在四个多模态推理基准上，相比Standard PRM，BayesianPRM平均降低Brier、Positive Brier、ECE、AverageCE 17.2%、24.1%、27.7%、19.2%，并提升Best-of-N与IAS的测试时扩展表现。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.23223v1/MathV360K.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.23223v1/MathV360K.svg" alt="Figure 1: Illustration of PRM uncertainty and policy uncertainty. (a)-(b) Prediction error distributions on MathV360K (ID) and Geometry3K (OOD), reflecting PRM uncertainty. (c)-(d) Prediction error distribution on UniGeo (ID) and MathVision (OOD), illustrating policy uncertainty. Prediction error is defined as the predicted reward minus the empirical success probability." loading="lazy" />
+                                </a>
+                                <a href="https://arxiv.org/html/2610.23223v1/mathverse.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.23223v1/mathverse.svg" alt="Figure 1: Illustration of PRM uncertainty and policy uncertainty. (a)-(b) Prediction error distributions on MathV360K (ID) and Geometry3K (OOD), reflecting PRM uncertainty. (c)-(d) Prediction error distribution on UniGeo (ID) and MathVision (OOD), illustrating policy uncertainty. Prediction error is defined as the predicted reward minus the empirical success probability." loading="lazy" />
+                                </a>
+                                <a href="https://arxiv.org/html/2610.23223v1/UniGeo_shift.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.23223v1/UniGeo_shift.svg" alt="Figure 1: Illustration of PRM uncertainty and policy uncertainty. (a)-(b) Prediction error distributions on MathV360K (ID) and Geometry3K (OOD), reflecting PRM uncertainty. (c)-(d) Prediction error distribution on UniGeo (ID) and MathVision (OOD), illustrating policy uncertainty. Prediction error is defined as the predicted reward minus the empirical success probability." loading="lazy" />
+                                </a>
+                                <a href="https://arxiv.org/html/2610.23223v1/mathvision.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.23223v1/mathvision.svg" alt="Figure 1: Illustration of PRM uncertainty and policy uncertainty. (a)-(b) Prediction error distributions on MathV360K (ID) and Geometry3K (OOD), reflecting PRM uncertainty. (c)-(d) Prediction error distribution on UniGeo (ID) and MathVision (OOD), illustrating policy uncertainty. Prediction error is defined as the predicted reward minus the empirical success probability." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: Illustration of PRM uncertainty and policy uncertainty. (a)-(b) Prediction error distributions on MathV360K (ID) and Geometry3K (OOD), reflecting PRM uncertainty. (c)-(d) Prediction error distribution on UniGeo (ID) and MathVision (OOD), illustrating policy uncertainty. Prediction error is defined as the predicted reward minus the empirical success probability.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.23223v1/mathvision_bar.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.23223v1/mathvision_bar.png" alt="" loading="lazy" />
+                                </a>
+                                <a href="https://arxiv.org/html/2610.23223v1/mathvision_conservatism.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.23223v1/mathvision_conservatism.png" alt="" loading="lazy" />
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.23223" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.23223v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.23223v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+            </section>
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">后训练强化学习与机械可解释性 (Post-Training, RLHF &amp; Interpretability)</span>
+                    <span class="track-count">3 selected</span>
+                </div>
+
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32281v1" target="_blank">&#34;Not&#34; is Not Lost in Translation: A Causal Analysis of Negation Representations in Multilingual LLMs</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ NTU / Monash / VinUni</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Giang Son Nguyen, Wray Buntine, Dung D. Le et al.</span>
+                        <span>arXiv ID: 2610.32281</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8.7/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">8.5/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.5/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文核心是机械可解释性与SAE因果干预，直接命中目标轨道中的可解释性、SAE主题，并非把技术借用到边缘场景；机构为NTU、Monash、VinUni，实验覆盖六个开源模型与八种语言，故相关性、扎实度和权威度均较高。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>这篇论文想弄清一件事：否定（not、不、ne…pas）在各语言中表面形式差别很大，但多语言大模型却能稳定地把它翻译对，那模型内部是不是共用同一套“否定表示”？作者的做法是：先造出只差一个否定的最小对比句对，把模型内部激活（残差流，即每一层不断累加的那条高维向量“信息主干道”）在否定句与肯定句上的差值平均成一个“否定方向”，相当于在模型内部找到一个可调旋钮；生成时把这个方向加上去或减掉，看译文极性是否真的翻转，这就是因果干预，即直接改动内部表示、观察输出是否随之改变，而非只做相关性观察。进一步，他们用稀疏自编码器（SAE，把一个混在一起的高维激活拆成很多“单独开关”，每个开关对应一个较可解释的特征）去找否定特征，发现每个模型只要一个SAE特征就足以跨语言控制极性。核心直觉是：否定在模型内部是一个可加可减的共享潜变量，而不只是表层词汇。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>输入是多语言文本token序列（英、法、越、中及俄、印地、阿拉伯、印尼语），在解码器指定层的残差流上、否定谓词位置或句末位置提取激活。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>输出是经激活干预后的生成译文及其否定极性翻转结果，量化为同语言与跨语言的添加/移除成功率及方向对齐度。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>对比激活加法提取否定方向：$\mathbf{d}_{\mathrm{CAA}}^{l,p}=\frac{1}{N}\sum_{i=1}^{N}\left(\mathbf{h}^{l,p,i}_{\mathrm{neg}}-\mathbf{h}^{l,p,i}_{\mathrm{pos}}\right)$，生成时施加 $\mathbf{h}&#39;_t=\mathbf{h}_t+\alpha_{\mathrm{CAA}}\mathbf{d}_{\mathrm{CAA}}$，$\alpha&gt;0$ 添加否定、$\alpha&lt;0$ 移除否定。</li>
+                        <li>用SAE分解残差激活 $\hat{\mathbf{h}}=\sum_{f=1}^{F} z_f\,\mathbf{W}_{\mathrm{dec}}[f]+\mathbf{b}_{\mathrm{dec}}$，按 $\delta_f=\mu_{\mathrm{neg},f}-\mu_{\mathrm{pos},f}$ 排序取top-K特征做稀疏干预。</li>
+                        <li>构建Mini-minus-4最小对比对与FLORES-minus-4自然翻译数据，扫描层-位置对与干预强度 $\alpha\in\{\pm2,\pm4,\pm6\}$，并测试方向向四种额外语言的跨语言迁移。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        Gemma-3-4B/12B与Qwen3.5-9B在英、越、法、中的同语言添加/移除翻转率多数达到或超过80%，单一英语提取方向跨语言仍达到48-100%添加与77-99%移除成功率。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32281v1/Intervention_steering_pipeline.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32281v1/Intervention_steering_pipeline.svg" alt="Figure 1: Overview of causal interventions on negation representations . Adding or subtracting a contrastive direction or one SAE feature’s decoder vector during translation can reverse polarity across languages." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: Overview of causal interventions on negation representations . Adding or subtracting a contrastive direction or one SAE feature’s decoder vector during translation can reverse polarity across languages.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32281v1/crosslang_within_vs_cross_grid.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32281v1/crosslang_within_vs_cross_grid.svg" alt="Figure 4: Per-layer comparison of within and cross-language flip rates. Cross-language lines are means of all 12 transfer directions’ flip rates, within-language lines are means of 4 within-language flip rates. Across all models, cross-language transfer strength follows within-language control and remains strong in multiple layers ." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 4: Per-layer comparison of within and cross-language flip rates. Cross-language lines are means of all 12 transfer directions’ flip rates, within-language lines are means of 4 within-language flip rates. Across all models, cross-language transfer strength follows within-language control and remains strong in multiple layers .</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32281" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32281v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32281v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32208v1" target="_blank">Do VLAs Know They Will Fail? Interpretable Success and Failure Patterns in Physical AI Systems</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 犹他大学Kahlert学院</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Christian A. Rogers, Qian Lin, Daniel S. Brown</span>
+                        <span>arXiv ID: 2610.32208</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">7.6/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">6.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.3/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">6.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">7.2/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">7.5/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文用SAE对VLA内部激活做机械可解释性分析并预测失败，属于可解释性核心方向，但不是RLHF/DPO后训练算法突破；机构为犹他大学，实验规模中等，故相关性与权威度未给最高。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>这篇论文要回答：机器人策略（VLA）在任务里快失败时，它自己“知不知道”？作者把 OpenVLA 模型内部的稠密激活（残差流，可以理解为模型每层传递的混合信号）用稀疏自编码器（SAE，一种把混杂信号拆成少量“单一含义”特征的解耦工具）拆成稀疏特征，发现这些特征能提前预测失败，还能定位成功/失败阶段对应的行为模式，并用视觉语言模型把这些模式翻译成人能读懂的行为描述。核心直觉是：稠密激活像一锅混在一起的汤，SAE 把它分成几味清晰的调料，于是既能在机器人进入不可恢复状态前预警，也能说清“它当时在干什么导致失败”。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>机器人多视角RGB观测与任务语言指令输入 OpenVLA 后产生的逐时刻第0层残差流激活（在图像token上取平均），并用40步滚动窗口统计。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>当前轨迹最终失败概率、与成功/失败阶段对应的 SAE 特征激活及时间区间，以及 VLM 生成的行为描述。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>将 OpenVLA 第0层残差流在图像token上平均得到 $\mathbf{h}_{i,t}$，用 TopK SAE（2048个特征、$K=64$）分解为稀疏激活 $\mathbf{a}_{i,t}$，以缓解多义性并保留结果预测信息。</li>
+                        <li>对原始激活与SAE特征分别做 $T=40$ 步滚动平均，训练逐时刻逻辑回归 $f_t$ 输出失败概率 $p_{\mathrm{fail}}(t)$，并与多数类基线和AUROC比较。</li>
+                        <li>定位成功/失败阶段强激活的单个SAE特征及激活突变时间区间，再用VLM解释管线生成行为描述，并在留出区间验证描述与特征激活的对应关系。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在LIBERO-10的500条OpenVLA-7B轨迹上，SAE特征预测最终失败的AUROC为0.81（原始激活0.80），且在留出失败轨迹上失败概率随恢复性下降而在不可恢复点前上升。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32208v1/online_accuracy.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32208v1/online_accuracy.svg" alt="Figure 1: For late timesteps, almost all trajectories are failures, so low t t performance is most relevant. (a) Raw activations and SAE features outperform the majority baseline at early timesteps. (b) Both representations achieve above-chance AUROC, indicating that they retain outcome-predictive information. (c) For held-out failures aligned at their point of no return (PNR, red line), predicted failure probability rises as estimated recoverability declines." loading="lazy" />
+                                </a>
+                                <a href="https://arxiv.org/html/2610.32208v1/online_auroc.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32208v1/online_auroc.svg" alt="Figure 1: For late timesteps, almost all trajectories are failures, so low t t performance is most relevant. (a) Raw activations and SAE features outperform the majority baseline at early timesteps. (b) Both representations achieve above-chance AUROC, indicating that they retain outcome-predictive information. (c) For held-out failures aligned at their point of no return (PNR, red line), predicted failure probability rises as estimated recoverability declines." loading="lazy" />
+                                </a>
+                                <a href="https://arxiv.org/html/2610.32208v1/aligned_on_pnr.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32208v1/aligned_on_pnr.svg" alt="Figure 1: For late timesteps, almost all trajectories are failures, so low t t performance is most relevant. (a) Raw activations and SAE features outperform the majority baseline at early timesteps. (b) Both representations achieve above-chance AUROC, indicating that they retain outcome-predictive information. (c) For held-out failures aligned at their point of no return (PNR, red line), predicted failure probability rises as estimated recoverability declines." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: For late timesteps, almost all trajectories are failures, so low t t performance is most relevant. (a) Raw activations and SAE features outperform the majority baseline at early timesteps. (b) Both representations achieve above-chance AUROC, indicating that they retain outcome-predictive information. (c) For held-out failures aligned at their point of no return (PNR, red line), predicted failure probability rises as estimated recoverability declines.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32208v1/fig_top1_compact_0480_task01.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32208v1/fig_top1_compact_0480_task01.png" alt="Figure 2: Activation traces over time and automatically detected critical intervals for the failed trajectories with the strongest activations of feature 480 in Task 1: &#34;Put both moka pots on the stove&#34;. It shows five uniformly sampled visualization frames above the full activation trace." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2: Activation traces over time and automatically detected critical intervals for the failed trajectories with the strongest activations of feature 480 in Task 1: &#34;Put both moka pots on the stove&#34;. It shows five uniformly sampled visualization frames above the full activation trace.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32208" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32208v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32208v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.31894v1" target="_blank">TaxoSAE: Rethinking Sparse Autoencoders through Taxonomic Logic</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 亚利桑那大学 / Scale AI</span>
+
+                        <a href="https://github.com/xinnyuguo/taxo-sae" target="_blank" class="badge badge-github">GitHub 开源</a>
+
+                        <span>发表日期: 2026-10-22</span>
+                        <span>作者: Xinyu Guo, Minglai Yang, Clayton T. Morrison et al.</span>
+                        <span>arXiv ID: 2610.31894</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">9/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">8/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.5/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文直接研究 SAE 特征空间的结构化与可控性，属于机械可解释性中 SAE 方向的核心问题，并提出堆叠 SAE 与分类对齐损失，相关性较强；机构非最顶级可解释性实验室，但实验覆盖两个分类学、两个基座模型及多种基线，整体扎实。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>大模型内部激活高度纠缠，稀疏自编码器（SAE）试图把它拆成稀疏、可读的“特征旋钮”；但现有 SAE 把每个旋钮当作孤立单元，忽略真实知识天然具有“猫是哺乳动物、哺乳动物是脊椎动物”这类上下位分类（is-a）关系。因此读出的概念层级不一致，编辑时也难界定改动的范围。TaxoSAE 按分类层级叠放多个 SAE（每层一个），并加入“分类对齐损失”：只要某概念本身或其任一下位词出现，就强制对应概念槽激活，相当于把分类树写入特征空间。于是读概念更集中、改概念更精准，还能借上位词读出训练中未直接见过的下位概念。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>自然语言事实问答问题（实体-关系三元组查询），以及冻结大语言模型在最后一个输入 token 处的隐藏状态向量；训练时附带分类学 is-a 层级标签与终端事实问答样本。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>各层级稀疏概念槽与互补元素槽的激活、事实答案的候选 logits；编辑概念槽后，可得到被定向修改的答案预测。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>堆叠式 SAE 架构：按分类学从终端节点到根节点逐层堆叠 SAE，底层读取 LLM 隐藏状态 $h^{(0)}$，高层读取低层重建 $h^{(k-1)}$；特征向量拆为自由槽、分类槽和互补槽，即 $z^{(k)}=[z_{\mathrm{free}}^{(k)};z_{\mathrm{taxo}}^{(k)};z_{\mathrm{comp}}^{(k)}]$。</li>
+                        <li>分类对齐损失：每个分类槽被训练为当对应节点或其任一下位词出现时激活，把 is-a 关系注入 SAE 特征空间，并与重建损失、稀疏损失和正交损失联合优化。</li>
+                        <li>双线性事实值预测头：将分类槽和互补槽分别映射为软节点嵌入 $e_t=\mathrm{softmax}(z_{\mathrm{taxo}}^{(k)})^{\top}C_t^{(k)}$ 与 $e_c=\mathrm{softmax}(z_{\mathrm{comp}}^{(k)})^{\top}C_c^{(k)}$，再输出候选答案 logits，使编辑某个概念槽能够定向改变对应事实答案。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在 Bio 与 Animal 两个事实问答分类学上，TaxoSAE 的上位词读出最高提升 31.3–37.9 分，swap 成功率提升 25.5 分，且抑制某概念时仅其自身答案降到 0–2%，其他概念仍保持 91–100% 准确率。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.31894v1/example.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.31894v1/example.png" alt="Figure 1: A taxonomy: each edge ( a , b ) (a,b) is an is-a link from hypernym a a to hyponym b b ; dashed edges mark further levels and nodes. Gray labels: a K = 3 K=3 example from the Animal taxonomy (full taxonomy in App. A ). 𝒯 \mathcal{T} axoSAE uses one SAE per level L k L_{k} (Fig. 2 )." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: A taxonomy: each edge ( a , b ) (a,b) is an is-a link from hypernym a a to hyponym b b ; dashed edges mark further levels and nodes. Gray labels: a K = 3 K=3 example from the Animal taxonomy (full taxonomy in App. A ). 𝒯 \mathcal{T} axoSAE uses one SAE per level L k L_{k} (Fig. 2 ).</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.31894v1/main-figure2.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.31894v1/main-figure2.png" alt="Figure 2: Overview of 𝒯 \mathcal{T} axoSAE. We train stacked SAEs on a frozen LLM’s last-token hidden state. (1) Stacked SAEs: one SAE per taxonomy level ( L 1 , … , K L_{1,\dots,K} in Fig. 1 ), each mapping the reconstruction of the level below onto its hypernyms. (2) Taxonomic alignment loss: each taxonomic slot is trained to fire when the input involves its node or any of the node’s hyponyms. Complement slots bind the complementary element; reconstruction, sparsity, and orthogonality losses complete the objective. Figure 8 shows the full slot layout of each level on both taxonomies." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2: Overview of 𝒯 \mathcal{T} axoSAE. We train stacked SAEs on a frozen LLM’s last-token hidden state. (1) Stacked SAEs: one SAE per taxonomy level ( L 1 , … , K L_{1,\dots,K} in Fig. 1 ), each mapping the reconstruction of the level below onto its hypernyms. (2) Taxonomic alignment loss: each taxonomic slot is trained to fire when the input involves its node or any of the node’s hyponyms. Complement slots bind the complementary element; reconstruction, sparsity, and orthogonality losses complete the objective. Figure 8 shows the full slot layout of each level on both taxonomies.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.31894" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.31894v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.31894v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+            </section>
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">流匹配与视频生成基础模型 (Flow Matching &amp; Video Generation)</span>
+                    <span class="track-count">3 selected</span>
+                </div>
+
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32381v1" target="_blank">UniWorld: A Unified World Model for Real-Time Visual World Simulation</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 未注明（作者机构信息缺失）</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Xin Zhang, Yabo Chen, Shuaiwei Wang et al.</span>
+                        <span>arXiv ID: 2610.32381</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">5.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">8.7/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">7.4/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.1/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文直接面向视频生成与连续世界模拟，核心贡献是流匹配采样中的历史延续与滚动几何状态机制，属于目标赛道核心算法工作；但作者机构信息缺失，且创新偏流式采样与状态管理而非全新生成模型，权威度与新颖性相应扣分。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>UniWorld 要解决的核心痛点是：在长时间连续生成视频或世界模型时，已生成画面的外观容易漂移，场景几何也难随视角持续演化。它的做法是把深度轨迹和参考图像外观并入同一个视频扩散或流匹配生成器，并把“已生成的历史视频”当作采样过程的边界条件保留下来：在每个去噪步，把历史潜变量重新放回当前噪声水平（即把干净历史按 $tH_i+(1-t)\epsilon_i$ 重新加噪到当前时刻），而不是直接把干净历史塞进带噪状态，这样历史既参与窗口内的双向注意力，又不会被改写。另一个关键机制是“滚动深度潜状态”：只保留当前窗口需要的几何条件，新窗口只增量读取深度后缀，只提交新生成视频后缀，从而用固定大小的状态实现长时连续生成和实时吞吐。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>单张参考 RGB 图像、可选文本提示、时空对齐的深度序列（估计深度、原生深度或模拟器深度），以及跨窗口继承的已生成视频潜变量历史。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>连续 RGB 视频潜变量及其解码帧，目标约 14 FPS 实时生成；同时维护滚动深度潜状态以支持后续窗口续生成。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>噪声对齐重叠续生成：用 $\mathcal{P}_{i,t}(z)=M_i\odot[tH_i+(1-t)\epsilon_i]+(1-M_i)\odot z$ 在每个采样步把继承历史前缀投影到当前噪声水平，$t_K=1$ 时精确恢复 $H_i$，且不增加模型评估次数。</li>
+                        <li>滚动深度潜状态：深度经 VAE 与 Patchify 编码为条件潜变量，窗口内固定，仅增量读取新深度后缀，把活跃几何状态长度限制在窗口大小。</li>
+                        <li>输出提交与缓存一致性：每窗口只追加新后缀 $z_i^{(K)}[h_i:L_i]$，缓存路径与增量路径输出逐位一致；结合 DMD 8 步蒸馏与 DiT 达到实时吞吐。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在 100 条 30 秒片段上，DMD8 配置的 VBench Quality Score 为 80.54，高于 H3 50-step 的 79.87、LongVie2 的 78.54 与 LongVie AR2 的 78.62，并达到 14 FPS 目标实时吞吐；整体 PSNR 为 13.3973 dB。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32381v1/Concept_Teaser.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32381v1/Concept_Teaser.png" alt="Figure 1: UniWorld: from world geometry to continuous visual observations. Conceptual overview: depth trajectories describe geometric evolution, while reference RGB specifies appearance for a shared video renderer." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: UniWorld: from world geometry to continuous visual observations. Conceptual overview: depth trajectories describe geometric evolution, while reference RGB specifies appearance for a shared video renderer.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32381v1/figs/uniworld_examples.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32381v1/figs/uniworld_examples.png" alt="Figure 4: One model across four scene categories. Actual reference, GT, and generated frames at the first continuation boundary and final frame. Rows use the first frozen ablation identity per category; selection is independent of quality scores." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 4: One model across four scene categories. Actual reference, GT, and generated frames at the first continuation boundary and final frame. Rows use the first frozen ablation identity per category; selection is independent of quality scores.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32381" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32381v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32381v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32373v1" target="_blank">Past as State, Present as Attention: Persistent-State Blockwise Flow Matching for Long-Horizon Co-Speech Motion Generation</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 同济大学/阿里巴巴/东京大学</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Yi Liu, Xiangyue Zhang, Jianfang Li et al.</span>
+                        <span>arXiv ID: 2610.32373</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">7.2/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">8.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">8.2/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">7.8/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>该文把流匹配真正用作长时程动作生成的主干，并在历史状态压缩与块因果建模上给出具体机制，属于流匹配方向的扎实应用创新；但它并非视频生成基础模型，故相关性未给满分。机构实力较强，但尚未达到顶尖实验室级别。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>论文要解决的是长时程语音驱动动作生成中的核心矛盾：逐段生成时，如果只参考最近几帧，风格会逐渐漂移；如果保留完整历史，计算和存储都会膨胀，而且数据有限时难以训练。作者观察到过去主要携带“变化很慢的风格”，当前片段则承载“变化很快的局部动作”，因此提出 PASPA：用块间持久状态把过去压缩成一份滚动更新的风格记忆，用块内双向注意力精细刻画当前片段的动作细节，并把两者嵌入分块流匹配框架。通俗地说，流匹配就是学习一条从纯噪声连续“流”向真实动作的去噪速度场；持久状态借门控机制衰减无关抖动、只保留稳定趋势；块内注意力只读取每块开始时的状态，因此从机制上杜绝“偷看未来”。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>语音波形/音频特征（含说话人风格条件），以及生成当前块时可用的历史动作片段和初始姿态；训练时当前块为加噪动作。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>与语音逐块对齐的长时程 SMPL-X 动作序列（55 个关节的 6D 旋转与 3D 全局平移）及 FLAME 面部表情系数序列。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>在分块流匹配中构造线性概率路径 $x_t=(1-t)x_0+t z$，学习从噪声 $z$ 到干净动作 $x_0$ 的速度场，并按块自回归生成。</li>
+                        <li>块间用门控 DeltaNet 维护持久状态 $S_i$：门控衰减瞬态波动、delta 规则选择性注入历史；块内查询只读取块起始状态 $S_{[n]}^0$，从机制上保证块因果、不泄露未来。</li>
+                        <li>当前块以块内双向自注意力建模快速局部动态，配合多块监督、预填充-解码状态缓存与混合无分类器引导，提升长序列训练与推理效率。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在 BEAT2 上取得最佳 FGD（1 Speaker 3.71、All Speakers 2.33），优于流匹配基线 GlobalDiff 的 4.78/2.63，并在 SHOW 与主观盲测中保持领先。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32373v1/teaser.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32373v1/teaser.png" alt="Figure 1 : Long-horizon co-speech motion generation (52 s) from the same speech and speaker, with the GT style keeping both hands raised near the chest. (a) Short-Seed Truncation matches the style initially but monotonically drifts: hands gradually drop. (b) Long-Context Token Attention retains full history but struggles to maintain a consistent style, matching or deviating regardless of temporal distance. (c) PASPA (ours) preserves the raised-hands style throughout, closely matching the GT." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1 : Long-horizon co-speech motion generation (52 s) from the same speech and speaker, with the GT style keeping both hands raised near the chest. (a) Short-Seed Truncation matches the style initially but monotonically drifts: hands gradually drop. (b) Long-Context Token Attention retains full history but struggles to maintain a consistent style, matching or deviating regardless of temporal distance. (c) PASPA (ours) preserves the raised-hands style throughout, closely matching the GT.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32373v1/network.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32373v1/network.png" alt="Figure 4 : Network architecture of PASPA. (a) BGDN propagates history through a persistent state 𝑺 [ n ] 0 \boldsymbol{S}_{[n]}^{0} via a block-causal GDN kernel. (b) BMHSA captures local dynamics via efficient block-diagonal bidirectional attention. The overall network (bottom) sequentially applies BGDN and BMHSA." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 4 : Network architecture of PASPA. (a) BGDN propagates history through a persistent state 𝑺 [ n ] 0 \boldsymbol{S}_{[n]}^{0} via a block-causal GDN kernel. (b) BMHSA captures local dynamics via efficient block-diagonal bidirectional attention. The overall network (bottom) sequentially applies BGDN and BMHSA.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32373" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32373v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32373v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.31981v1" target="_blank">Compatible Likelihoods for Flow Matching on Manifolds</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 剑桥大学</span>
+
+
+                        <span>发表日期: 2026-10-22</span>
+                        <span>作者: Lucas Ng, Georgios Batzolis, Mark Girolami</span>
+                        <span>arXiv ID: 2610.31981</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">9.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">8.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">6.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">7.8/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文直接剖析流匹配训练目标的正确性并提出兼容性判据与可行速度似然目标，属于流匹配核心机理突破；但实验集中在黎曼流形上的地理与姿态生成，未涉及视频生成或大规模视频基础模型，故相关性未给满分，流形ODE开销也限制工程落地分。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>流匹配的目标是学一个“速度场”，把噪声沿时间推成数据；在弯曲流形上，现有做法常改为让网络预测端点、再由端点反推速度。论文指出这种间接做法不一定学到真实的边缘速度场，甚至会把样本推离数据分布，并把“训练目标的最优解是否等于条件速度的期望”称为兼容性。作者给出兼容性的通用判据和误差界，并提出用端点空间的指数族似然来训练，把条件速度作为充分统计量，等价于对普通流匹配损失重新加权，使模型只关注流形上物理可行的速度，并区别对待速度大小与方向错误。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>训练时为流形上的基分布采样点、连续时间步及配对的训练数据端点；推理时为流形上的基分布样本与时间步。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>流形切空间中的边缘速度场，经ODE积分得到数据流形上的生成样本。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>把兼容性定义为种群最优速度满足 $u_t(x_t)=\mathbb{E}_{p_t(x_1\mid x_t)}[u_t^{\mathrm{cond}}(x_t\mid x_1)]$，并证明RG-VFM以Fréchet/Karcher均值端点反推速度在流形上一般不满足该条件。</li>
+                        <li>给出似然型流匹配目标兼容性的通用条件，并将最坏情形误差分解为兼容时消失的残差分量，用于诊断现有目标。</li>
+                        <li>构造端点空间指数族似然，以条件速度为充分统计量，得到仅在可行速度上支撑的加权流匹配损失；在常曲率流形上对流速大小与方向误差施加不同权重。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在一维平坦环面解析测试中，本方法恢复接近零的理想速度并避免RG-VFM的双峰失败，同时在高维乘积环面、球面地理基准（4个中2个NLL改善）和高维人体姿态采样指标上优于或持平先前方法，推理NFE约443，远低于RG-VFM的数万级。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.31981v1/torus_velocity_error.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.31981v1/torus_velocity_error.svg" alt="Figure 2 : Velocity magnitude ‖ v t = 1 4 θ ​ ( 0 ) ‖ g \|v^{\theta}_{t=\frac{1}{4}}(0)\|_{g} swarmplot, 30 seeds. The upper RG-VFM cluster has better training loss but poorer generative performance; see table 2 ." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2 : Velocity magnitude ‖ v t = 1 4 θ ​ ( 0 ) ‖ g \|v^{\theta}_{t=\frac{1}{4}}(0)\|_{g} swarmplot, 30 seeds. The upper RG-VFM cluster has better training loss but poorer generative performance; see table 2 .</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.31981v1/torus_velocity_time_profile.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.31981v1/torus_velocity_time_profile.svg" alt="Figure 4 : v t θ ​ ( x = 0 ) v^{\theta}_{t}(x{=}0) as a function of t t . One representative seed per method. The vertical dashed line marks τ = 1 4 \tau=\tfrac{1}{4} . RG-VFM (Upper) jumps between the two globally minimizing branches at ± 4 ​ π 3 \pm\tfrac{4\pi}{3} predicted in section 3.1 . It takes many small steps for the ODE solver to resolve the stiff field." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 4 : v t θ ​ ( x = 0 ) v^{\theta}_{t}(x{=}0) as a function of t t . One representative seed per method. The vertical dashed line marks τ = 1 4 \tau=\tfrac{1}{4} . RG-VFM (Upper) jumps between the two globally minimizing branches at ± 4 ​ π 3 \pm\tfrac{4\pi}{3} predicted in section 3.1 . It takes many small steps for the ODE solver to resolve the stiff field.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.31981" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.31981v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.31981v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+            </section>
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">大模型推理与长上下文架构 (LLM Reasoning &amp; Architecture)</span>
+                    <span class="track-count">3 selected</span>
+                </div>
+
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32492v1" target="_blank">Accordion: Elastic-Depth Inference via Fixed-Prefix Layer Looping</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 未注明/独立团队</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Yudong Zhang, Wei Ding, Kaili Zheng et al.</span>
+                        <span>arXiv ID: 2610.32492</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">5.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">7.0/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">7.2/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文核心是面向 LLM 弹性推理预算的固定前缀层循环 MoE 架构与多预算训练，直接关联大模型架构、推理效率以及数学推理/代码生成，属于目标轨道核心方向；但作者机构未注明，权威度证据不足。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>这篇论文要解决的是：不同推理预算通常要训练和维护多个大模型，成本很高。Accordion 让同一个 MoE 模型通过“固定前缀层循环”提供五档推理深度——最低档不循环，越高档就重复中间连续层越多遍，从而用共享权重实现弹性算力。关键概念中，层循环就是把部分 Transformer 层再执行一遍；MoE 是按 token 路由到不同专家子网络；预算匹配多教师蒸馏是让多个领域专家分别在对应预算路径上指导学生模型。核心直觉是把“模型深度”变成可调旋钮，同时避免为每档预算复制整套参数。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>文本 token 序列（数学题、代码上下文、指令 prompt）以及用户选择的推理预算 k（Low/Medium/High/XHigh/Ultra）</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>下一个 token 的概率分布与生成文本（数学推理解、代码生成结果或指令跟随回答）</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>模型在中间连续层窗口 $\mathcal{W}=\{w_1,\dots,w_m\}$ 上定义预算菜单 $\mathcal{K}$，预算 $k$ 重复前缀 $\mathcal{S}_k=\{w_1,\dots,w_k\}$，使层 $\ell$ 执行 $r_{\ell}(k)=1+\mathbf{1}\{\ell\in\mathcal{S}_k\}$ 次，总执行层数为 $L+k$。</li>
+                        <li>被循环层在第二遍使用逐通道门控，例如 $v_2=u_2+\tanh(g_{\ell}^{M})\odot\mathcal{M}_{\ell}(\mathrm{N}_{\ell}^{M}(u_2);b_{\ell}^{(2)})$，门控初始化为零使第二遍初始为恒等映射，并为首遍/二遍分别维护 MoE 负载均衡偏置。</li>
+                        <li>联合预训练目标为 $\mathcal{J}(\theta)=\mathbb{E}_{\mathcal{B},k}[\mathcal{L}_{\mathrm{NTP}}+\lambda_{\mathrm{seq}}\mathcal{L}_{\mathrm{seq}}]$，每个 micro-batch 采样一个预算 $k\sim\mathrm{Uniform}(\mathcal{K})$；SFT/RL 阶段通过参数组合并与预算匹配的多教师 on-policy 蒸馏保持五档预算能力。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        经过 3.6T token 预训练后，提升推理深度使 Accordion-6B-A0.5B 在 37 个任务的五类宏平均上提升 3.01 个百分点，中间预算以一半额外层执行获得 89% 的增益，且最终模型在对应任务-预算平均上超过各领域专家。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32492v1/layer_selection.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32492v1/layer_selection.svg" alt="Figure 2: Comparison of eight layer-selection strategies. Accordion’s fixed prefix over layers 7–18 is highlighted in blue. Strategies are compared at matched inference budgets." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2: Comparison of eight layer-selection strategies. Accordion’s fixed prefix over layers 7–18 is highlighted in blue. Strategies are compared at matched inference budgets.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32492v1/specialist_comparison.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32492v1/specialist_comparison.svg" alt="Figure 3: Shared models and budget-specific specialists. Accordion uses uniform budget sampling. Comparisons match training tokens (80B, left) or training FLOPs (right). Each specialist is trained for a single budget. The left panel also includes two controls with increased unlooped-path exposure, defined below." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 3: Shared models and budget-specific specialists. Accordion uses uniform budget sampling. Comparisons match training tokens (80B, left) or training FLOPs (right). Each specialist is trained for a single budget. The left panel also includes two controls with increased unlooped-path exposure, defined below.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32492" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32492v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32492v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32234v1" target="_blank">MS-TTRL: Breaking the Frequency Conflict in Multiple-Solution Test-Time Reinforcement Learning</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 北航 / 新加坡国立大学</span>
+
+                        <a href="https://github.com/zzx-peter/Multiple-Solution-TTRL" target="_blank" class="badge badge-github">GitHub 开源</a>
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Zhixia Zhang, Binqian Xu, Huaiyang Wang et al.</span>
+                        <span>arXiv ID: 2610.32234</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">8.0/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">7.8/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文直击大模型多解推理在无标签测试时强化学习中的频率冲突，属于LLM reasoning的核心算法问题，但并非长上下文、KV cache、Mamba/MoE等架构层面创新；北航与NUS属中坚偏上机构，实验覆盖多任务多骨干且5个随机种子，故综合给到中高分段。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>大模型做数学、逻辑这类可能有多个正确答案的题目时，测试时强化学习（TTRL）没有标准答案，只能拿模型自己生成答案的“出现频率”当正确性信号，可是频率同时又被用来鼓励多样性，两个目标互相打架：常见答案被当成对的、稀有答案被当成错的压掉，这就是“频率冲突”。论文的做法是把两件事拆开：正确性不再看出现几次，而是把每个最终答案当成一个待检验的假设，让模型自己反过来推演它是否满足题目条件（结果级自验证），频率只保留用来奖励稀有答案；同时用“三状态缓存”（对/待定/错）记住已验过的答案避免重复验证，并只对“很少出现但确实验证通过”的答案加大奖励权重（置信门控逆概率缩放）。直觉就是：判断对错靠验算，不靠投票；保持多样性才靠频率。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>无标注的多解推理题文本（数学、因果发现、三维结构、布尔表达式等），以及模型对每题采样出的多条自然语言解答。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>更新后的模型策略参数，以及每题候选答案的验证状态、正确性置信度与用于强化学习的奖励信号。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>用结果映射 $\phi$ 把每题 $G$ 条回答合并为结果集 $\mathcal{Z}_t(x)$，对每个结果独立自验证 $n$ 次，以通过率 $p_t(z\mid x)$ 作为与出现频率无关的正确性估计。</li>
+                        <li>维护按问题-结果索引的三状态缓存 $\mathcal{S}_t,\mathcal{C}_t,\mathcal{W}_t$，以阈值 $\tau_{\mathrm{low}},\tau_{\mathrm{high}}$ 划为 correct/candidate/wrong，仅重验候选与新结果，显著减少验证调用。</li>
+                        <li>置信门控逆概率缩放只对稀有且验证可靠的结果施加 $1/n(z\mid x)$ 加权，把正确性估计与多样性保持彻底解耦。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在HypoSpace三个子集与MACE-Math上，MS-TTRL的平均Recovery Rate比最佳无标签基线高19.13个百分点，并在多数设置接近有监督的IPS-GRPO。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32234v1/idea_figure.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32234v1/idea_figure.png" alt="Figure 1: Frequency conflict and signal decoupling in MS-TTRL. Left: Frequency-based correctness estimation favors common outcomes, whereas diversity preservation favors rare ones. Middle: Self-verification estimates correctness, while outcome frequency promotes diversity. Right: MS-TTRL achieves higher Recovery Rate than TTRL and TTRL-CoCoV across four tasks." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: Frequency conflict and signal decoupling in MS-TTRL. Left: Frequency-based correctness estimation favors common outcomes, whereas diversity preservation favors rare ones. Middle: Self-verification estimates correctness, while outcome frequency promotes diversity. Right: MS-TTRL achieves higher Recovery Rate than TTRL and TTRL-CoCoV across four tasks.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32234v1/method_figure.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32234v1/method_figure.png" alt="Figure 2: Overview of MS-TTRL. For each unlabeled problem, generated solution outcomes are self-verified and maintained in a three-state outcome cache. Their stored status is then combined with gated inverse-probability scaling to reward outcomes, thereby decoupling correctness estimation from diversity preservation with limited cost of self-verification." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2: Overview of MS-TTRL. For each unlabeled problem, generated solution outcomes are self-verified and maintained in a three-state outcome cache. Their stored status is then combined with gated inverse-probability scaling to reward outcomes, thereby decoupling correctness estimation from diversity preservation with limited cost of self-verification.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32234" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32234v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32234v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32213v1" target="_blank">Head Dimension Matters in Language Models for Long-Context Retrieval</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ PFN（Preferred Networks）</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Seiya Tokui, Shoichiro Yamaguchi, Sosuke Kobayashi</span>
+                        <span>arXiv ID: 2610.32213</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">8.3/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">8.5/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文直接研究长上下文 MHA 的头维度预算分配与 retrieval head 机制，与注意力架构和 KV cache 强相关，属于长上下文架构的核心经验规律；但它主要是系统性实证与超参数取舍分析，并非推理算法或全新模型机制，因此相关性与创新性未打满。PFN 是扎实的工业界研究机构，但并非 DeepMind/OpenAI 级顶尖学术巨头。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>这篇论文研究多头注意力里“每个头的维度”如何影响长上下文检索能力。通俗地说，头维度就是每个注意力头中 Query/Key/Value 向量的宽度；在注意力参数、计算量和 KV cache 预算基本固定的前提下，论文比较两种分配方式：把预算分给更多窄头，还是分给更少但更宽的头。宽头的 QK 表示空间更大，因此更容易准确判断该关注哪些位置；Value 容量更大，因此能更有力地搬运信息。作者发现：宽头显著提升 RULER 长上下文检索且不牺牲短上下文能力，并伴随更高比例的 retrieval head，即专门关注关键片段的注意力头。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>长上下文文本 token 序列（最长 256K），包含预训练/持续预训练语料与 RULER 检索任务中的上下文和查询</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>下一 token 概率分布、RULER 各检索任务的答案与 0-100 分数，以及逐注意力头的检索分数和 retrieval head 判定</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>在固定 $H d$ 的注意力参数、计算量与 KV cache 预算下，对比 $d=128,256,512$ 的对称头配置与 $d_{QK}=512,d_V=128$、$d_{QK}=128,d_V=512$ 非对称配置，以隔离头宽与头数的影响。</li>
+                        <li>用 RULER 单针任务逐头计算检索分数，将分数 $\ge 0.1$ 的全注意力头判为 retrieval head，并统计其比例来解释宽头收益。</li>
+                        <li>在长上下文 CPT 中冻结注意力投影 $W_Q,W_K,W_V,W_O$ 做消融，宽头仍提升检索，说明收益还来自 embedding、MLP 等非注意力组件更有效的适配。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        3B SFT 下 $d=512$ 的 RULER-100 平均分为 58.49，高于 $d=128$ 的 48.28 与 $d=256$ 的 51.81；0.6B CPT 下 $d=512$ 为 41.21，高于 $d=128$ 的 31.25，且短上下文任务未受损。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32213v1/mean_score_by_length_06B.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32213v1/mean_score_by_length_06B.svg" alt="Figure 1: RULER-100 scores by context length. Each point averages 13 tasks at the indicated context length on a 0–100 scale. In (a), lines and bands show the mean and ± \pm sample standard deviation across three 0.6B runs. In all the settings, d512 achieves the highest (average) score at every evaluated length." loading="lazy" />
+                                </a>
+                                <a href="https://arxiv.org/html/2610.32213v1/mean_score_by_length_3B.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32213v1/mean_score_by_length_3B.svg" alt="Figure 1: RULER-100 scores by context length. Each point averages 13 tasks at the indicated context length on a 0–100 scale. In (a), lines and bands show the mean and ± \pm sample standard deviation across three 0.6B runs. In all the settings, d512 achieves the highest (average) score at every evaluated length." loading="lazy" />
+                                </a>
+                                <a href="https://arxiv.org/html/2610.32213v1/mean_score_by_length_3bsft.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32213v1/mean_score_by_length_3bsft.svg" alt="Figure 1: RULER-100 scores by context length. Each point averages 13 tasks at the indicated context length on a 0–100 scale. In (a), lines and bands show the mean and ± \pm sample standard deviation across three 0.6B runs. In all the settings, d512 achieves the highest (average) score at every evaluated length." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: RULER-100 scores by context length. Each point averages 13 tasks at the indicated context length on a 0–100 scale. In (a), lines and bands show the mean and ± \pm sample standard deviation across three 0.6B runs. In all the settings, d512 achieves the highest (average) score at every evaluated length.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32213v1/retrieval_heads_gqa_seed_comparison_06B.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32213v1/retrieval_heads_gqa_seed_comparison_06B.svg" alt="Figure 3: Retrieval-head fractions in the (a) 0.6B and (b) 3B models. Left: the fraction of full-attention query heads classified as retrieval heads; annotations give the retrieval-head count relative to the total number of eligible heads. Right: retrieval-head fractions within individual full-attention layers, using zero-based layer indices. The 0.6B results are means across three runs; faint lines show individual runs. Each 3B model has one run. Wider-head models exhibit higher retrieval-head fractions at both scales, while absolute retrieval-head counts remain comparable across allocations." loading="lazy" />
+                                </a>
+                                <a href="https://arxiv.org/html/2610.32213v1/retrieval_heads_gqa_seed_comparison_3B.svg" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32213v1/retrieval_heads_gqa_seed_comparison_3B.svg" alt="Figure 3: Retrieval-head fractions in the (a) 0.6B and (b) 3B models. Left: the fraction of full-attention query heads classified as retrieval heads; annotations give the retrieval-head count relative to the total number of eligible heads. Right: retrieval-head fractions within individual full-attention layers, using zero-based layer indices. The 0.6B results are means across three runs; faint lines show individual runs. Each 3B model has one run. Wider-head models exhibit higher retrieval-head fractions at both scales, while absolute retrieval-head counts remain comparable across allocations." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 3: Retrieval-head fractions in the (a) 0.6B and (b) 3B models. Left: the fraction of full-attention query heads classified as retrieval heads; annotations give the retrieval-head count relative to the total number of eligible heads. Right: retrieval-head fractions within individual full-attention layers, using zero-based layer indices. The 0.6B results are means across three runs; faint lines show individual runs. Each 3B model has one run. Wider-head models exhibit higher retrieval-head fractions at both scales, while absolute retrieval-head counts remain comparable across allocations.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32213" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32213v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32213v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+            </section>
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">世界模型 &amp; WAM (World Models)</span>
+                    <span class="track-count">3 selected</span>
+                </div>
+
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32977v1" target="_blank">UniAction: Unified Action Conditioning for World Models</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 斯坦福大学</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Bowen Xue, Zizhang Li, Hong-Xing Yu et al.</span>
+                        <span>arXiv ID: 2610.32977</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">9.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">9.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">8.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">8.0/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.8/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>直面动作条件世界模型中异构动作割裂的核心痛点，提出统一动作表征与注意力校准机制，属目标赛道的关键算法贡献；斯坦福团队与四类动作的系统评测增强可信度，但依赖大规模视频扩散骨干，实时性与算力开销限制落地。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>现有动作条件世界模型基本是一类动作配一个模型：力、相机指令、手部姿态、机器人姿态各训各的，把本就稀缺的动作标注数据进一步切碎，也无法共享预训练视频模型的时空先验。UniAction 的做法是把任何动作都拆成一组稀疏的“动作元素”，每个元素只回答两件事——它是什么（离散语义身份，比如“左手腕关节”或“按 W 键前进”，去一张共享码本里查出一个动作 token），以及它在何时何地生效（视频时间和画面位置上的连续坐标，直接套用视频骨干已有的位置编码）。这样不同种类的动作就落在同一个时空坐标系里，被同一套自注意力统一处理，等价于把异构动作“翻译”成视频模型本来就懂的语言。论文还发现一个隐藏偏差：动作 token 越多，它在注意力里天然占的份额越大，跟动作本身是否匹配无关，于是提出基数校准注意力，给所有动作 logit 加同一个偏置 $\log(N_{\mathrm{ref}}/N)$，把不同粗细的动作拉回同一注意力尺度，同时不改变动作 token 之间的相对关系。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>初始单帧 RGB 图像、文本提示，以及异构动作序列（力向量、键盘相机控制指令、逐帧手部关节姿态、机器人关节姿态），统一编码为带语义身份与时空落点坐标的稀疏动作元素集合。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>条件生成的未来视频帧序列，反映该动作作用下的场景时空演化。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>任意动作统一表示为稀疏动作元素集合 $A=\{(s_i,\mathbf{p}_i)\}_{i=1}^{N}$，语义身份 $s_i$ 经共享码本索引为动作 token $\mathbf{a}_i=E[s_i]$，落点坐标 $\mathbf{p}_i=(t_i,y_i,x_i)$ 描述其在视频时空中的作用位置。</li>
+                        <li>动作坐标经骨干 VAE 压缩映射为潜空间坐标 $\mathbf{p}_i^{\mathrm{lat}}=g_{\mathcal{B}}(\mathbf{p}_i)$，与视频 token 共用同一套 3D RoPE 位置编码和自注意力，从而直接复用预训练视频模型的时空建模能力。</li>
+                        <li>基数校准注意力对动作 logit 施加统一偏置 $\hat{\ell}_i^a=\ell_i^a+\log(N_{\mathrm{ref}}/N)$，使总动作注意力质量 $Z_a$ 不再随动作 token 数 $N$ 变化，同时保持动作 token 间相对注意力不变。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在力、相机控制、手部姿态、机器人姿态四类动作上，UniAction 的动作跟随优于替代条件方案，且单个联合训练模型超过各动作专属专家模型。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32977v1/teaser.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32977v1/teaser.png" alt="Figure 1: One world model for heterogeneous actions. Instead of training a separate model per action type (left), UniAction conditions a single world model (middle) on heterogeneous actions and outperforms the action-specific experts across all four action forms (right)." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: One world model for heterogeneous actions. Instead of training a separate model per action type (left), UniAction conditions a single world model (middle) on heterogeneous actions and outperforms the action-specific experts across all four action forms (right).</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32977v1/method.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32977v1/method.png" alt="Figure 2: Overview of UniAction. Diverse action forms are represented as sparse action elements: semantic identities index tokens in a shared codebook (Sec. 3.1 ), spatiotemporal positions use the backbone’s native positional encoding (Sec. 3.2 ), and action and video tokens interact via cardinality-calibrated attention (Sec. 3.3 )." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2: Overview of UniAction. Diverse action forms are represented as sparse action elements: semantic identities index tokens in a shared codebook (Sec. 3.1 ), spatiotemporal positions use the backbone’s native positional encoding (Sec. 3.2 ), and action and video tokens interact via cardinality-calibrated attention (Sec. 3.3 ).</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32977" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32977v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32977v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32742v1" target="_blank">Adaptive World-Models for Anomaly Recognition (AWARE): A Framework for Robot Dynamics Prediction and Introspection</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 帝国理工学院 BOLD 实验室</span>
+
+                        <a href="https://github.com/adaptive-intelligent-robotics/aware" target="_blank" class="badge badge-github">GitHub 开源</a>
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Luke Beddow, George Mavroghenis, Rodrigo Chacon Quesada et al.</span>
+                        <span>arXiv ID: 2610.32742</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">8.7/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.6/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">8.4/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.1/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>以动作条件世界模型加潜空间动力学估计为核心做机器人异常识别与故障定位，属于世界模型轨道的扎实应用与机制改进；但重心在异常检测，而非通用世界模型或 WAM 的生成、控制能力突破，故相关性未满分。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>很多老旧工业设备没有电机编码器等内部传感器，或有严格安全限制不让读取，AWARE 只用外部摄像头拍摄的画面，就能提前判断机器人工作得是否正常。它的思路是把设备看作一个由动作推动的物理系统，先根据过去一段状态与动作历史，反推出当前系统内部状态，也就是所谓潜空间动力学编码；这个编码可以理解为系统当前的体质状态，例如某个电机的力量是偏弱还是正常，之后再用世界模型预测下一步状态。判断是否出现异常时，它同时看两件事：一是这个体质编码是否偏离正常范围，二是预测误差大不大；而且误差会按模型输出的不确定度归一化，也就是模型越没把握的预测越不当成异常证据，避免误报。更巧妙的是，编码还能被解密回具体物理参数，因此不仅能报警，还能指出是哪个电机出现了退化。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>外部 RGB 摄像头视频及由此估计的机器人关节状态和操作员控制动作历史，其中关节状态包括吊车回转、变幅、起升以及吊物双摆角；不使用电机编码器等内部传感器。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>下一时刻机器人状态的高斯分布预测、潜空间动力学编码、逐时刻异常分数与轨迹级异常判定，以及从编码解码出的动力学参数，用于定位故障源。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>沿用 ROA 教师-学生思路：教师编码器 $h_\psi$ 把仿真中采样的真实动力学参数 $\gamma_t$ 映射为潜码 $z_t$，学生估计器 $g_\phi$ 仅凭状态-动作历史 $\tau_t$ 预测 $\hat{z}_t$，损失为 $\|g_\phi(\tau_t)-h_\psi(\gamma_t)\|^2$，且该潜码由下游世界模型塑造，面向动力学预测而非控制。</li>
+                        <li>世界模型 $f_\theta(s_{t+1}\mid \tau_t,a_t,z)$ 输出对角高斯 $\mathcal{N}(\hat{s}_{t+1},\operatorname{diag}(\hat{\sigma}_{t+1}^2))$，以负对数似然训练，并在 Transformer 与 RSSM 两种骨干上验证架构无关性。</li>
+                        <li>异常分数联合潜码偏差与按不确定度归一化的预测误差 $e_t=\frac{1}{N}\sum_{k=t-N}^{t-1}\lvert s_{k+1}-\hat{s}_{k+1}\rvert\oslash\hat{\sigma}_{k+1}$，与正常运行参考分布比较；另设系统参数解码器从 $\hat{z}_t$ 还原 $\gamma$ 以定位故障。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在 240 条真实吊车轨迹、仅摄像头含噪状态估计下，AWARE 的异常分类较最强基线提升 26%，并以 88% 准确率定位退化电机。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32742v1/fig1_v14_wide_corl.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32742v1/fig1_v14_wide_corl.png" alt="Figure 1: System and model overview, showing human-operated robotic crane used for anomaly detection experiments. AWARE operates as follows: 1) camera-based state estimation; 2) estimation of system hidden dynamics parameters; 3) prediction of future trajectory; 4) anomaly recognition via examination of both the estimated dynamics parameters and the trajectory prediction error." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: System and model overview, showing human-operated robotic crane used for anomaly detection experiments. AWARE operates as follows: 1) camera-based state estimation; 2) estimation of system hidden dynamics parameters; 3) prediction of future trajectory; 4) anomaly recognition via examination of both the estimated dynamics parameters and the trajectory prediction error.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32742v1/fig2_SystemArch_v11_camera_ready.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32742v1/fig2_SystemArch_v11_camera_ready.png" alt="Figure 2: AWARE framework. Our model consists of two key components. First, a Latent Dynamics Estimator (green) reconstructs a latent encoding of system dynamics ( z ^ t \hat{z}_{t} ) using a history of state-action pairs. Second, a World Model (blue) predicts the next state, given this encoding, the same history, and the current action. This integrated framework enables introspection (yellow) and anomaly detection (red) by comparing dynamics estimations and state prediction errors ( e t e_{t} ) against their expected distributions under normal operation." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2: AWARE framework. Our model consists of two key components. First, a Latent Dynamics Estimator (green) reconstructs a latent encoding of system dynamics ( z ^ t \hat{z}_{t} ) using a history of state-action pairs. Second, a World Model (blue) predicts the next state, given this encoding, the same history, and the current action. This integrated framework enables introspection (yellow) and anomaly detection (red) by comparing dynamics estimations and state prediction errors ( e t e_{t} ) against their expected distributions under normal operation.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32742" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32742v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32742v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32657v1" target="_blank">DT-JEPA: Learning to Predict Future Representations for Decision-Making</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 东南大学 / 香港大学 / 国防科大</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Changxu Ni, Yiyang Ni, Jun Li et al.</span>
+                        <span>arXiv ID: 2610.32657</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">7.8/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">7.5/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>把 JEPA 潜空间未来表示预测接入 Decision Transformer，属于世界模型/潜动力学服务于决策的核心路线，但并非动作条件生成式 WAM 或视频世界模型，创新以组合与概率化改造为主；机构为东南大学、港大、国防科大等，非该赛道头部实验室。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>Decision Transformer 用“希望拿到多少未来回报”当作条件来生成动作，但回报是一个被压缩过的数字：不同的走法、不同的状态转移可能对应同一个回报，条件信息含糊；而且回报的定义绑死在具体任务的奖励函数上，换个奖励就得重新标注数据、重新训练。这篇论文的做法是：先不管奖励，拿一堆离线轨迹做“世界模型式”的自我预训练——让模型只看过去的状态和动作，去猜“未来那段轨迹在特征空间里长什么样”。这里的关键名词“潜空间预测”可以理解成：不要求模型一帧一帧还原未来的原始画面，而只要求它预测未来被编码后的抽象特征，因为还原像素这种细枝末节对做决策没用，抽象特征才抓得住真正影响决策的动力学信息。作者还把“只猜一个未来”改成“猜未来的一整个概率分布”（概率预测器），等于承认未来有多种可能，输出里既带最可能的走向，也带“有多不确定”。最后，这个预测出的未来特征被当作条件信号，通过自适应层归一化（AdaLN，即用未来特征动态缩放和平移网络中间层的激活值）注入策略网络来引导动作生成；再用少量在线交互和任务专属的价值评估器微调，从而把一个“没学过奖励”的通用世界模型快速迁移到新任务。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>预训练：无奖励离线轨迹中过去的状态-动作序列（上下文视图）及其未来片段（目标视图）。策略阶段：历史轨迹与 JEPA 预测出的未来潜表示（分布参数）。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>未来潜表示的条件分布参数，以及条件化于该未来表示的动作分布（控制量）；在线微调阶段额外输出价值/critic 估计用于策略改进。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>潜空间未来预测：上下文编码器 $f_\theta$ 编码历史，目标编码器 $f_{\theta&#39;}$ 经 EMA 更新编码未来片段，预测器最小化 $\|g_\phi(f_\theta(x_C),\xi_T)-f_{\theta&#39;}(x_T)\|_2^2$。</li>
+                        <li>将单点回归换成概率预测器 $q_\phi(z_T\mid z_C,\xi_T)$，建模未来表示的条件分布并采样聚合，显式刻画未来动力学的不确定性。</li>
+                        <li>以 AdaLN 注入未来潜表示：$\operatorname{AdaLN}(h_t,\hat{F}_t)=\gamma(\hat{F}_t)\odot\frac{h_t-\mu(h_t)}{\sqrt{\sigma^2(h_t)+\epsilon}}+\beta(\hat{F}_t)$，配合无奖励预训练与任务 critic 在线微调完成适应。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在 D4RL 的 MuJoCo、AntMaze 与 Maze2D 上多数任务优于 TD3-BC、QT、ODT、PDT 等基线（如 Hopper-m-r 达 98.3），验证了无奖励 JEPA 预训练向未见奖励任务迁移的有效性。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32657v1/F14.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32657v1/F14.png" alt="Figure 1: (a) RTG summarizes future with a ambiguous target return, while DT-JEPA instead predicts latent future dynamics from historical context and effectively guide current decision making. (b) From an information-theoretic perspective, a more informative future condition reduces uncertainty about future trajectories and preserves richer future information." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: (a) RTG summarizes future with a ambiguous target return, while DT-JEPA instead predicts latent future dynamics from historical context and effectively guide current decision making. (b) From an information-theoretic perspective, a more informative future condition reduces uncertainty about future trajectories and preserves richer future information.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32657v1/F3.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32657v1/F3.png" alt="Figure 2: Overview of the proposed DT-JEPA framework . DT-JEPA learns to make decisions using predicted future-dynamics information. During pretraining, a probabilistic JEPA predictor generates latent future representations to modulate DT through AdaLN. During online fine-tuning, specific critics provide value guidance to adapt the pretrained policy to unseen reward objectives." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2: Overview of the proposed DT-JEPA framework . DT-JEPA learns to make decisions using predicted future-dynamics information. During pretraining, a probabilistic JEPA predictor generates latent future representations to modulate DT through AdaLN. During online fine-tuning, specific critics provide value guidance to adapt the pretrained policy to unseen reward objectives.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32657" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32657v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32657v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+            </section>
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">具身智能 &amp; VLA (Vision-Language-Action)</span>
+                    <span class="track-count">3 selected</span>
+                </div>
+
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32676v1" target="_blank">Retiming Robot Demonstrations with a Learned Speed Prior</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 首尔国立大学 MLLab (SNU)</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Seungyong Moon, Deokjae Lee, Hansang Lee et al.</span>
+                        <span>arXiv ID: 2610.32676</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">7.8/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.0/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文针对 VLA 策略学习中示教节奏偏差污染策略的核心数据痛点，提出可跨任务复用的速度先验与保形重定时机制，并在 π0.5 策略上完成仿真与真机验证，属该赛道扎实的数据侧与算法侧突破；机构为首尔国立大学 MLLab，属知名研究组但非 DeepMind/Stanford 级顶尖实验室，权威度给中上分。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>遥操作采来的机器人示教，动作快慢往往由操作员个人手速决定，而不是任务本身决定；同一段路径在不同示教里忽快忽慢，VLA 策略学下去就把操作员的&#34;生物钟&#34;也一起学走了，还会把慢节奏带进推理，导致动作拖沓、抖动大。本文的做法是：先从大规模示教里学一个&#34;速度先验&#34;——给它任务指令、一段去掉时间信息的纯几何路径（沿线等距取点的位置、姿态、夹爪开合）和腕部相机图像，它不去猜一个确定速度，而是输出每个路径小段上速度的概率分布，再从这个分布里挑一个分位数（中位数=典型节奏，0.99 分位=偏快档）当作&#34;节拍器&#34;。有了节拍器，就能把源示教（比如机器人遥操作）按目标节奏（比如人手拿着夹爪做示范的快慢）重新卡点：轨迹形状一个字不改，只把时间轴拉伸压缩，这叫&#34;重定时 (retiming)&#34;。关键突破在于复用性：过去要加速某段动作，必须针对当前任务再拟合一次、再标一次，或者预设几档固定倍速；而训练一次速度先验，就能覆盖整个数据集的所有任务。直觉上，这是把&#34;做什么动作&#34;和&#34;用多快做&#34;彻底解耦，前者来自示教路径，后者来自数据先验，重定时后的数据再拿去微调 VLA 策略；执行时接一个实时最优控制层，按预测节奏在机器人自身约束下跟踪动作块。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>任务语言指令；沿末端执行器路径按弧长 2 厘米等距重采样得到的 17 节点窗口，每节点含相对中心节点的三维位置、旋转向量、夹爪开合度与最近腕部相机 RGB 图像；以及示教的域标签（源/目标、机器人遥操作或人手手持夹爪演示）</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>每个路径区间上机械臂速度与夹爪速度在对数速度空间的 256 桶类别概率分布（取分位数得速度曲线，积分后得到弧长到时间的重定时时钟）；下游输出为按该节拍生成的关节目标动作块，交由实时最优控制层跟踪执行</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>将轨迹解耦为几何路径与时间时钟，用融合平移、旋转、夹爪开合的弧长增量 $\Delta s_k=\sqrt{\|\mathbf{p}_{k+1}-\mathbf{p}_k\|^2+\rho_r^2\theta(R_k^\top R_{k+1})^2+\rho_g^2(o_{k+1}-o_k)^2}$ 度量进度，重定时仅替换时钟 $t(s)\rightarrow\hat{t}(s)$ 而保持路径不变。</li>
+                        <li>速度先验为窗口 Transformer：输入指令 token、17 组图像与节点 token 及 16 个查询 token，在对数速度 256 分桶上以两热编码做交叉熵 $\mathcal{L}=-\frac{1}{|\mathcal{J}|}\sum_{j\in\mathcal{J}}\mathbf{z}_j^\top\log\hat{\mathbf{z}}_j$，区间时长取两执行器较慢者 $T_j=\max(L^a_j/v^a_j,\;L^g_j/v^g_j)$。</li>
+                        <li>以类 classifier-free guidance 方式提问&#34;目标演示者会多快走这条路&#34;：$\tilde{f}^a=f^a(\mathrm{src},I)+\lambda\left[f^a(\mathrm{tgt},\emptyset)-f^a(\mathrm{src},\emptyset)\right]$，训练中以 0.5 概率丢弃图像以解耦外观与节奏；执行端用实时最优控制在机器人约束下跟踪动作块。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        RoboLab 120 个语言条件任务在等速下对比，重定时微调的 π0.5 策略成功率更高且 jerk 至多降至均匀加速基线的一半；真机叠杯 3.50 秒完成，较默认策略 6.02 秒快 1.72 倍，30 次试验成功 29 次。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32676v1/real_world_tasks_photos.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32676v1/real_world_tasks_photos.png" alt="Figure 3: Real-world tasks and their instructions, each shown at its initial scene (1) and its goal (2). The policies for stacking cups, folding towel and cleaning trash are fine-tuned on handheld YUBI demonstrations, and placing bananas and placing cubes are performed zero-shot (Appendix H )." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 3: Real-world tasks and their instructions, each shown at its initial scene (1) and its goal (2). The policies for stacking cups, folding towel and cleaning trash are fine-tuned on handheld YUBI demonstrations, and placing bananas and placing cubes are performed zero-shot (Appendix H ).</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32676" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32676v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32676v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32431v1" target="_blank">When to Stop Penalizing Actions? Martingale GRPO for VLA Reinforcement Learning</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 香港大学/清华大学</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Zongyao Zhao, Cheng-Jie Zhao, Ruihang Jiang et al.</span>
+                        <span>arXiv ID: 2610.32431</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">9.2/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">9.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">8.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">8.0/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.8/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>论文直接面向 VLA 策略的 GRPO 后训练，核心创新是用鞅停止条件与 VLM 事件定位修正失败轨迹的信用分配，属于具身智能与 VLA 的核心算法突破；但实验仅覆盖 RoboTwin 2.0 仿真与单一 OpenVLA-OFT 底座，充分性略保守。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>GRPO 做 VLA 强化学习时，一条失败轨迹里所有动作会共享同一个负的 advantage，于是机器人犯错后的自救动作也被一起惩罚，这正是本文要解决的信用分配痛点。作者用“鞅（martingale）”这个概率工具来刻画理想截断点：在这些点上，被删掉的梯度在已知信息下的条件期望为零，所以截断既不会系统性带偏原 GRPO 梯度的期望，还可能降低方差；直白说就是“该罚的罚到错误发生处为止，后面的补救别乱罚”。具体实现时，用 LoRA 微调的 VLM 在完整 rollout 视频里找出“最后一个可见错误且此后没有恢复”的区间：保留错误区间内的失败反馈，砍掉其后的恢复尝试，让策略更新更准。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>头部 RGB 图像、本体感知状态与任务语言指令；训练时还输入完整多视角 rollout 视频，供冻结 VLM 定位失败事件边界。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>失败轨迹的动作级反馈掩码与截断边界，用于修正 GRPO 的轨迹级 advantage；最终 VLA 策略输出离散动作 token（动作 chunk）形式的机械臂控制序列。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>将失败反馈截断建模为对 GRPO 轨迹级 advantage 的时间掩码 $\widetilde{A}_{i,k}=w_{i,k}A_i$：成功轨迹全段保留，失败轨迹只保留到边界 $B_i$，避免把错误后的恢复尝试与错误本身一起惩罚。</li>
+                        <li>用成功概率鞅 $P_k=\mathbb{E}[R\mid\mathcal{F}_k]$ 与策略得分鞅 $S_t=\sum_{k&lt;t}Z_k$ 定义剩余条件信用 $\chi_t$；当 $\chi_T=0$ 时，截断后的组梯度是完整梯度的条件投影，满足 $\mathbb{E}[G_{g,T}]=\mathbb{E}[G_g]$ 且 $\operatorname{Cov}(G_g)-\operatorname{Cov}(G_{g,T})\succeq 0$。</li>
+                        <li>用 LoRA 微调 VLM 在完整 rollout 视频中定位“最后一个可见错误且未观察到恢复”的区间，保留错误区间反馈、截断其后恢复尝试，同时保持成功 rollout 损失项与原 token 归一化不变。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        在 RoboTwin 2.0 七个任务上，MART-GRPO 把 OpenVLA-OFT 的平均成功率从 Full GRPO 的 65.01% 提升到 68.64%（+3.63 点），held-out seed 提升 6.03 点，Handover 任务提升 8.98 点。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32431v1/figures/assets/motivation.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32431v1/figures/assets/motivation.png" alt="Figure 1: Errors and recovery attempts within a failed rollout. Selected RoboTwin hammer frames from two scenes, a success (top) and a failure (bottom). The red outline marks the hammer after it is lost at chunk 2, and the later frames show recovery attempts. In mixed-outcome groups, full GRPO assigns the error and subsequent recovery attempts the same negative advantage." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1: Errors and recovery attempts within a failed rollout. Selected RoboTwin hammer frames from two scenes, a success (top) and a failure (bottom). The red outline marks the hammer after it is lost at chunk 2, and the later frames show recovery attempts. In mixed-outcome groups, full GRPO assigns the error and subsequent recovery attempts the same negative advantage.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32431v1/vlm_localization_example.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32431v1/vlm_localization_example.png" alt="Figure 7: Event localization on a test rollout. Head-camera frames of a failed Handover. Blue outlines mark the interval identified by both the reference annotation and the selected model. Chunk indices are zero-based." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 7: Event localization on a test rollout. Head-camera frames of a failed Handover. Blue outlines mark the interval identified by both the reference annotation and the selected model. Chunk indices are zero-based.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32431" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32431v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32431v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32330v1" target="_blank">DynaSlots: Slot-Centric 3D Dynamics Pretraining for Robot Manipulation</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 北航/鹏城实验室</span>
+
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Meng Li, Lijiang Chen, Qi Zhao et al.</span>
+                        <span>arXiv ID: 2610.32330</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">8.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7.2/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">7.5/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">8.0/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.0/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>该论文是面向机器人操作的 3D 动态表征预训练与扩散策略工作，属于具身智能/操作策略核心方向，但不含语言指令与 VLA 多模态决策，因此相关性未给满分；机构为北航与鹏城实验室，权威度良好但非顶尖 VLA 实验室。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>现有 3D 预训练常把整帧场景的运动压成一个全局“隐动作”，一旦画面里有多个物体在动，就会把不同语义的变化混在一起。DynaSlots 改为把每帧点云拆成少量跨帧对应的 slot（可理解为会跟踪的软区域/部件令牌），再对每个 slot 单独做两件事：用“逆动力学”从前后特征差反推它发生了什么变化（隐动作），用扩散式“前向动力学”预测它下一步会变成什么样，并学习 slot 之间的接近与相对运动关系。核心直觉是“局部变化就该局部建模”，让表征抓住任务相关的运动，忽略背景杂乱和无关外观。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>预训练：无动作、无标签的纯坐标点云序列（三帧，步长 $k$）。下游策略：两帧观测点云与机器人状态。</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>预训练：每个 slot 的隐动作与未来 slot 状态预测。下游：扩散策略生成的机器人动作序列（末端执行器/夹爪控制）。</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>Point Transformer 将每帧点云 token 化；时间槽绑定器以上一帧 slot 为 query，对当前点做跨 slot 竞争分配与按点重归一化聚合，再经残差 MLP 更新，得到 $K=6$ 个时序一致的软 slot $(s_t^i,c_t^i,u_t^i)$。</li>
+                        <li>逆动力学模型由 slot 特征差提取每个 slot 的隐动作 $\alpha^i=g_\psi(s_{t+k}^i-s_t^i)$；跨 slot 扩散前向动力学以当前 slot 特征、质心和隐动作为条件预测未来 slot 特征，交互头估计 slot 对之间的接近与运动关系。</li>
+                        <li>整体用 VICReg 式自监督损失对齐在线编码器与 EMA 目标编码器，包含噪声预测、slot VICReg、关系 BCE 与分配熵；下游将 slot 条件 token 经 cross-attention 与 FiLM 注入扩散策略。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        Meta-World 平均成功率 80.8%（AFRO 76.0%，+4.8pp），Adroit 平均 88.0%（AFRO 83.0%，+5.0pp），并在真实 RM65-B 上对场景杂乱与未见物体更鲁棒。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32330v1/fig1.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32330v1/fig1.png" alt="Fig. 1: Scene-level versus slot-centric 3D dynamics pretraining. (a) Potential limitations of scene-level modeling (b) DynaSlots uses temporally aligned soft slots, assigns one latent action to each slot, and models pairwise proximity-and-motion relations across slots." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Fig. 1: Scene-level versus slot-centric 3D dynamics pretraining. (a) Potential limitations of scene-level modeling (b) DynaSlots uses temporally aligned soft slots, assigns one latent action to each slot, and models pairwise proximity-and-motion relations across slots.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32330v1/fig2.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32330v1/fig2.png" alt="Fig. 2: DynaSlots framework. (a) Three point-cloud frames are encoded by a shared Point Transformer and propagated by a temporal slot binder into K = 6 K{=}6 aligned soft slots. The IDM extracts per-slot latent actions from feature differences, and the cross-slot encoder conditions a diffusion FDM on current slot features, centroids, and actions. An EMA target branch supplies noised future slot features, while an auxiliary interaction head predicts pairwise proximity-and-motion relations. The displayed losses are noise prediction, slot VICReg, relation BCE, and assignment entropy. (b) Previous slots query current point tokens through competitive assignment, weighted aggregation, and residual refinement, repeated three times per frame. (c) Two observed point clouds and the robot state produce slot condition tokens for the diffusion policy, which predicts the action sequence using cross-attention and FiLM." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Fig. 2: DynaSlots framework. (a) Three point-cloud frames are encoded by a shared Point Transformer and propagated by a temporal slot binder into K = 6 K{=}6 aligned soft slots. The IDM extracts per-slot latent actions from feature differences, and the cross-slot encoder conditions a diffusion FDM on current slot features, centroids, and actions. An EMA target branch supplies noised future slot features, while an auxiliary interaction head predicts pairwise proximity-and-motion relations. The displayed losses are noise prediction, slot VICReg, relation BCE, and assignment entropy. (b) Previous slots query current point tokens through competitive assignment, weighted aggregation, and residual refinement, repeated three times per frame. (c) Two observed point clouds and the robot state produce slot condition tokens for the diffusion policy, which predicts the action sequence using cross-attention and FiLM.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32330" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32330v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32330v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+            </section>
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">端到端自动驾驶 (Autonomous Driving)</span>
+                    <span class="track-count">1 selected</span>
+                </div>
+
+                <article class="paper-card">
+                    <h2 class="paper-title">
+                        <a href="http://arxiv.org/abs/2610.32069v1" target="_blank">DriveMind: Mind-Evolving Belief Tracking for Closed-Loop Autonomous Driving</a>
+                    </h2>
+
+                    <div class="paper-meta">
+                        <span class="badge" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700;">🏛️ 华盛顿大学</span>
+
+                        <a href="https://github.com/shiyannacl/drivemind" target="_blank" class="badge badge-github">GitHub 开源</a>
+
+                        <span>发表日期: 2026-10-23</span>
+                        <span>作者: Yan Shi, Kehua Chen, Jiarui Qi et al.</span>
+                        <span>arXiv ID: 2610.32069</span>
+                    </div>
+
+                    <!-- 各维度打分栏 -->
+                    <div class="score-bar">
+                        <div class="score-item">
+                            <div class="score-label">赛道相关性</div>
+                            <div class="score-val" style="color: #2563eb;">9.2/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">机构权威度</div>
+                            <div class="score-val" style="color: #0f172a;">7.8/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">创新性</div>
+                            <div class="score-val">8.0/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">工程可行性</div>
+                            <div class="score-val">7.2/10</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">实验完备性</div>
+                            <div class="score-val">8.2/10</div>
+                        </div>
+                        <div class="score-item" style="border-right: none; background: #f1f5f9; border-radius: 4px;">
+                            <div class="score-label" style="color: var(--accent);">综合指数</div>
+                            <div class="score-val" style="color: var(--accent);">8.4/10</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin: -8px 0 14px 2px; line-height: 1.45;">
+                        <span style="font-weight: 600; color: var(--secondary);">💡 评估判定：</span>核心贡献是把多假设信念跟踪与粒子滤波引入 MLLM 端到端闭环驾驶，直接针对场景理解、机动决策与轨迹生成主线；华盛顿大学牵头，密歇根大学与麦吉尔大学合作，Bench2Drive 闭环实验扎实，但 VLM 低频推理带来实时性约束。
+                    </div>
+
+                    <!-- 白话概要 TL;DR -->
+                    <div class="tldr-box">
+                        <strong>白话概述：</strong>当前基于多模态大模型的自动驾驶器每一帧都从头推理，并且只锁定一个场景解释；在无信号路口、对向来车等歧义场景里，它容易过早认定错误判断，等看到证据时已经做出动作。DriveMind 换了个思路：像粒子滤波那样同时保留多组自然语言假设，每组假设有一个权重，代表它目前的可信度；每来一帧新画面，就让大模型检查这些假设是否与观测一致，一致的加权，不一致的减权；如果某个假设权重过大，其余假设几乎被忽略，就重新采样并生成多样化假设，防止过早下结论；最后由快速扩散控制器根据这些假设的加权结果生成轨迹。通俗说，就是让自动驾驶器在心里同时保留几种猜测，不急着下结论，而是让后续画面逐步检验这些猜测，从而在歧义交互中做出更稳健的决策。
+                    </div>
+
+                    <!-- 输入与输出定义 -->
+                    <div class="io-box">
+                        <div class="io-row">
+                            <span class="io-label">输入 Input:</span>
+                            <span>闭环仿真中的当前及历史多视角车载图像、历史动作，以及上一时刻的多假设信念状态</span>
+                        </div>
+                        <div class="io-row">
+                            <span class="io-label">输出 Output:</span>
+                            <span>未来路径点轨迹（控制量）、各假设权重与机动意图分布、更新后的信念状态</span>
+                        </div>
+                    </div>
+
+                    <!-- 核心机制与数学公式 -->
+                    <div class="section-label">核心机制与技术实现 (Method &amp; Formulation)</div>
+                    <ul class="tech-list">
+                        <li>把驾驶策略写成对自然语言假设的边际化 $p(a_t\mid\mathcal{H}_t)=\sum_{k} w_t^{k}\,p(a_t\mid h_t^{k},\mathcal{H}_t)$，用 $K$ 个加权假设近似开放解释空间的后验。</li>
+                        <li>借鉴粒子滤波做预测-校正-重采样：VLM 依据上一假设、上一动作与当前观测传播 $h_t^{k}$，用一致性得分 $s_t^{k}$ 按 $w_t^{k}\propto w_{t-1}^{k}\exp(s_t^{k}/\beta)$ 重新加权，并以有效样本数 $ESS_t=1/\sum_{k}(w_t^{k})^{2}$ 触发多样化重采样。</li>
+                        <li>慢速 VLM（约 2 Hz）更新信念并边际化机动分布，快速扩散控制器（约 10 Hz）以最新信念为条件生成未来路径点，两者异步运行以兼顾推理深度与控制频率。</li>
+                    </ul>
+
+                    <!-- 实验结论 -->
+                    <div class="section-label">关键评测与消融结论 (Empirical Takeaway)</div>
+                    <div class="takeaway-box">
+                        Bench2Drive 上同一驾驶管线加入信念跟踪后，DS 由 68.50 升至 81.37、SR 由 41.36% 升至 54.09%，无信号路口与来车交互场景各提升约 20 DS。
+                    </div>
+
+                    <!-- 关键架构与方法全景图 (Key Figures) -->
+                    <div class="section-label">核心全景与方法架构图 (Key Figures)</div>
+                    <div class="figures-container">
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32069v1/first.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32069v1/first.png" alt="Figure 1 : From single-chain reasoning to mind-evolving belief. (a) Instance-Based Framework: one rationale per timestep. (“CoT” stands for “Chain of Thought”) (b) Mind-Evolving Framework: multiple hypotheses { h t k } \{h_{t}^{k}\} propagated over time; darker color indicates higher hypothesis weight." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 1 : From single-chain reasoning to mind-evolving belief. (a) Instance-Based Framework: one rationale per timestep. (“CoT” stands for “Chain of Thought”) (b) Mind-Evolving Framework: multiple hypotheses { h t k } \{h_{t}^{k}\} propagated over time; darker color indicates higher hypothesis weight.</div>
+                        </div>
+                        <div class="figure-card">
+                            <div class="figure-img-wrap">
+                                <a href="https://arxiv.org/html/2610.32069v1/main.png" target="_blank" title="点击查看大图">
+                                    <img src="https://arxiv.org/html/2610.32069v1/main.png" alt="Figure 2 : DriveMind overview. (a) An asynchronous fast–slow architecture: a slow vision-language model (VLM) maintains a multi-hypothesis belief state, while a fast diffusion planner generates trajectories. (b) Belief tracking through hypothesis propagation and reweighting. (c) The belief state evolves as new observations arrive." loading="lazy" />
+                                </a>
+                            </div>
+                            <div class="figure-caption">Figure 2 : DriveMind overview. (a) An asynchronous fast–slow architecture: a slow vision-language model (VLM) maintains a multi-hypothesis belief state, while a fast diffusion planner generates trajectories. (b) Belief tracking through hypothesis propagation and reweighting. (c) The belief state evolves as new observations arrive.</div>
+                        </div>
+                    </div>
+
+                    <div class="paper-links">
+                        <a href="https://arxiv.org/html/2610.32069" target="_blank">View HTML</a>
+                        <a href="https://arxiv.org/pdf/2610.32069v1" target="_blank">Download PDF</a>
+                        <a href="http://arxiv.org/abs/2610.32069v1" target="_blank">arXiv Entry</a>
+                    </div>
+                </article>
+            </section>
+            <section class="track-section">
+                <div class="track-header">
+                    <span class="track-title">自动驾驶感知算法 (Autonomous Driving Perception)</span>
+                    <span class="track-count">0 selected</span>
+                </div>
+
+                <div style="font-size: 13px; color: var(--muted); font-style: italic;">No new unique papers matched for this domain today.</div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            由 GitHub Actions 自动化生成 &bull; DeepSeek Flash 深度研读 &bull; KaTeX 原生数学渲染
+        </footer>
+    </div>
+</body>
+</html>
