@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from inbox_agent.imap import (
     LABEL_SPECS,
     DraftService,
+    Email,
     FlagService,
     ImapConnection,
     LabelService,
@@ -118,7 +119,7 @@ class ToolContext:
     draft_service: DraftService
     memory: InboxMemory
     current_code: str = "inbox"
-    current_emails: list[dict[str, Any]] = field(default_factory=list)
+    current_emails: list[Email] = field(default_factory=list)
 
 
 # ==============================================================================
@@ -225,8 +226,8 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
 
     # 1. 优先从当前批次传入的邮件列表快速匹配
     for item in ctx.current_emails:
-        if item.get("message_id") == m_id:
-            email_info = item
+        if item.message_id == m_id:
+            email_info = item.to_dict()
             break
 
     # 2. 本地历史已处理记录查验

@@ -29,7 +29,7 @@ from inbox_agent.config import (
     get_now_bjt,
     validate_config,
 )
-from inbox_agent.imap import ImapConnection, LabelService, MessageRepo
+from inbox_agent.imap import Email, ImapConnection, LabelService, MessageRepo
 from inbox_agent.memory import HistoryMemory, InboxMemory
 from inbox_agent.renderer import render_history_email_report
 from utils.mailer import send_email_html
@@ -65,10 +65,9 @@ def main():
             is_processed_func=history_memory.is_processed,
         )
         # 2. 应用层安全护栏双重校验：确保邮件发送日期绝对早于截止时间，杜绝服务端时区/解析差异导致的误伤
-        raw_old_emails = []
+        raw_old_emails: list[Email] = []
         for e in fetched_emails:
-            e_dict = e.to_dict()
-            date_str = e_dict.get("date", "")
+            date_str = e.date or ""
             try:
                 msg_dt = email.utils.parsedate_to_datetime(date_str)
                 # 统一时区进行防御性比对
@@ -77,12 +76,12 @@ def main():
                 else:
                     is_older = msg_dt.replace(tzinfo=None) < cutoff_dt.replace(tzinfo=None)
                 if not is_older:
-                    print(f"[Safety Warning] 发现晚于 90 天阈值的邮件，已安全拦截跳过: '{e_dict.get('subject')}' (日期: {date_str})")
+                    print(f"[Safety Warning] 发现晚于 90 天阈值的邮件，已安全拦截跳过: '{e.subject}' (日期: {date_str})")
                     continue
             except Exception:
                 # 无法解析日期时由于已有 IMAP BEFORE 过滤，保留处理
                 pass
-            raw_old_emails.append(e_dict)
+            raw_old_emails.append(e)
 
         print(f"[IMAP] 抓取并核验待研判历史邮件: {len(raw_old_emails)} 封")
     except Exception as e:
@@ -125,10 +124,9 @@ def main():
                 except Exception:
                     pass
 
-            m_id = item.get("message_id")
-            raw_uid = item.get("uid")
-            uid = int(raw_uid) if raw_uid is not None else None
-            subject = item.get("subject", "无主题")
+            m_id = item.message_id
+            uid = item.uid
+            subject = item.subject or "无主题"
 
             decision = classify_history_email(item, DEEPSEEK_API_KEY, my_email=GMAIL_USER)
             action = decision.get("action", "delete")
@@ -137,7 +135,7 @@ def main():
 
             # 若发现依然包含有效的未来日程或关键跟进事项，写入待办池
             if decision.get("has_active_schedule") and decision.get("event_date"):
-                merged_schedule = {**item, **decision}
+                merged_schedule = {**item.to_dict(), **decision}
                 inbox_memory.add_schedule(merged_schedule)
                 print(f"  [发现有效待办] '{subject}' -> 日期: {decision.get('event_date')} ({tldr})")
 
@@ -158,7 +156,7 @@ def main():
                     batch_to_archive.append(uid)
                 print(f"  [决策: 通用归档] '{subject}' (原因: {reason})")
             elif action == "keep_inbox":
-                kept_items.append({**item, **decision})
+                kept_items.append({**item.to_dict(), **decision})
                 print(f"  [决策: 保留收件箱] '{subject}' (原因: {reason})")
 
             # 标记已完成历史研判处理
