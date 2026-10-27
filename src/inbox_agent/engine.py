@@ -44,8 +44,10 @@ def build_batch_user_prompt(
     batch_num: int,
     total_batches: int,
     current_code: str = "inbox",
+    current_date: str | None = None,
 ) -> str:
     """从 Jinja2 模板渲染单批次邮件快照 Prompt，附带 Message-ID 以便日程提取"""
+    current_date_str = current_date or get_bjt_date_str()
     clean_emails = []
     for e in batch_emails:
         text_source = e.body or e.snippet or ""
@@ -53,7 +55,7 @@ def build_batch_user_prompt(
         clean_emails.append({
             "uid": str(e.uid),
             "sender": e.from_addr,
-            "date": e.date,
+            "date": e.date_str if hasattr(e, "date_str") else str(e.date),
             "subject": e.subject,
             "message_id": e.message_id,
             "snippet": clean_snippet,
@@ -66,6 +68,7 @@ def build_batch_user_prompt(
         batch_num=batch_num,
         total_batches=total_batches,
         current_code=current_code,
+        current_date=current_date_str,
     )
 
 

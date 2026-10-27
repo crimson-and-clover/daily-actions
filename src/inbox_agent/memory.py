@@ -2,9 +2,10 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from inbox_agent.config import (
     HISTORY_MEMORY_FILE,
@@ -13,6 +14,7 @@ from inbox_agent.config import (
     IS_CI,
     get_now_bjt,
 )
+from utils.timezone import parse_bjt_datetime
 
 
 class ScheduleItem(BaseModel):
@@ -25,40 +27,71 @@ class ScheduleItem(BaseModel):
     from_addr: str = Field(default="", alias="from")
     tldr: str = ""
     action_items: list[str] = Field(default_factory=list)
-    event_date: str
+    event_date: datetime
     event_time: str = ""
     timezone: str = "Asia/Shanghai"  # 酒店、航班等跨时区行程明确时区（如 Asia/Tokyo, America/New_York）
     advance_days: int = 3
     priority: str = "P1"
-    added_at: str = Field(default_factory=lambda: get_now_bjt().strftime("%Y-%m-%d %H:%M:%S"))
-    updated_at: str | None = None
+    added_at: datetime = Field(default_factory=get_now_bjt)
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
+    @field_validator("event_date", mode="before")
+    @classmethod
+    def _coerce_event_date(cls, v: Any) -> datetime:
+        return parse_bjt_datetime(v)
+
+    @field_validator("added_at", "updated_at", mode="before")
+    @classmethod
+    def _coerce_optional_dt(cls, v: Any) -> datetime | None:
+        if v is None or v == "":
+            return None
+        return parse_bjt_datetime(v)
+
+    @property
+    def event_date_str(self) -> str:
+        dt = parse_bjt_datetime(self.event_date)
+        return dt.format("YYYY-MM-DD")
+
 
 class InboxStateData(BaseModel):
-    """日常收件箱记忆状态 (Schema v1)"""
+    """日常收件箱记忆状态 (Schema v2, Datetime 强类型)"""
 
-    version: int = 1
+    version: int = 2
     processed_message_ids: list[str] = Field(default_factory=list)
     spam_message_ids: list[str] = Field(default_factory=list)
     active_schedules: list[ScheduleItem] = Field(default_factory=list)
     total_processed: int = 0
     total_spam_filtered: int = 0
-    last_run: str = ""
+    last_run: datetime | None = None
 
     model_config = ConfigDict(extra="ignore")
+
+    @field_validator("last_run", mode="before")
+    @classmethod
+    def _coerce_last_run(cls, v: Any) -> datetime | None:
+        if not v:
+            return None
+        return parse_bjt_datetime(v)
 
 
 class HistoryStateData(BaseModel):
-    """历史积压清理记忆状态 (Schema v1)"""
+    """历史积压清理记忆状态 (Schema v2, Datetime 强类型)"""
 
-    version: int = 1
+    version: int = 2
     history_processed_ids: list[str] = Field(default_factory=list)
     total_pruned_90d: int = 0
-    last_run: str = ""
+    last_run: datetime | None = None
 
     model_config = ConfigDict(extra="ignore")
+
+    @field_validator("last_run", mode="before")
+    @classmethod
+    def _coerce_last_run(cls, v: Any) -> datetime | None:
+        if not v:
+            return None
+        return parse_bjt_datetime(v)
 
 
 class EncryptedStore:
@@ -173,12 +206,12 @@ class InboxMemory:
         else:
             item = schedule_item
 
-        event_date = item.event_date.strip()
-        if not event_date:
-            return None
+        item_ev_date = parse_bjt_datetime(item.event_date)
 
         # 依据 schedule_id 或 (message_id + title + event_date) 查重与就地覆盖更新
         for existing in self.data.active_schedules:
+            existing_ev_date = parse_bjt_datetime(existing.event_date)
+            same_date = existing_ev_date.date() == item_ev_date.date()
             match = False
             if item.schedule_id and existing.schedule_id == item.schedule_id:
                 match = True
@@ -186,10 +219,10 @@ class InboxMemory:
                 item.message_id
                 and existing.message_id == item.message_id
                 and existing.title == item.title
-                and existing.event_date == event_date
+                and same_date
             ):
                 match = True
-            elif not item.message_id and existing.title == item.title and existing.event_date == event_date:
+            elif not item.message_id and existing.title == item.title and same_date:
                 match = True
 
             if match:
@@ -198,70 +231,73 @@ class InboxMemory:
                 existing.from_addr = item.from_addr or existing.from_addr
                 existing.tldr = item.tldr or existing.tldr
                 existing.action_items = item.action_items or existing.action_items
-                existing.event_date = item.event_date
+                existing.event_date = item_ev_date
                 existing.event_time = item.event_time or existing.event_time
                 existing.timezone = item.timezone or existing.timezone
                 existing.advance_days = item.advance_days
                 existing.priority = item.priority
-                existing.updated_at = get_now_bjt().strftime("%Y-%m-%d %H:%M:%S")
+                existing.updated_at = get_now_bjt()
                 return existing
 
         self.data.active_schedules.append(item)
         return item
 
-    def get_due_schedules(self, today_str: str) -> list[dict]:
+    def get_due_schedules(self, today_str: str = "", now: datetime | None = None) -> list[dict]:
         """
         获取当前需要提醒的日程列表：
         - 今天到期 (days_left == 0)
         - 预警期内 (0 < days_left <= advance_days)
         - 已逾期 1 天 (days_left == -1)；逾期 1 天以上直接过滤不显示
         """
-        dt_today = datetime.strptime(today_str, "%Y-%m-%d")
+        if now is not None:
+            now_dt = parse_bjt_datetime(now)
+        elif today_str:
+            now_dt = parse_bjt_datetime(today_str)
+        else:
+            now_dt = get_now_bjt()
+
+        today_date = now_dt.date()
         due_list = []
         for item in self.data.active_schedules:
-            ev_date = item.event_date.strip()
-            if not ev_date:
-                continue
-            try:
-                dt_ev = datetime.strptime(ev_date, "%Y-%m-%d")
-                delta_days = (dt_ev - dt_today).days
-                advance = item.advance_days
+            ev_dt = parse_bjt_datetime(item.event_date)
+            ev_date = ev_dt.date()
+            delta_days = (ev_date - today_date).days
+            advance = item.advance_days
 
-                item_dict = item.model_dump(by_alias=True)
-                if delta_days == 0:
-                    item_dict["due_status"] = "今天到期"
-                    item_dict["days_left"] = 0
-                    due_list.append(item_dict)
-                elif 0 < delta_days <= advance:
-                    item_dict["due_status"] = f"还剩 {delta_days} 天"
-                    item_dict["days_left"] = delta_days
-                    due_list.append(item_dict)
-                elif delta_days == -1:
-                    item_dict["due_status"] = "已逾期 1 天"
-                    item_dict["days_left"] = -1
-                    due_list.append(item_dict)
-                # 逾期 1 天以上 (delta_days < -1) 不再纳入提醒视图
-            except (ValueError, TypeError):
-                continue
+            item_dict = item.model_dump(by_alias=True)
+            item_dict["event_date"] = ev_dt.format("YYYY-MM-DD")
+            if delta_days == 0:
+                item_dict["due_status"] = "今天到期"
+                item_dict["days_left"] = 0
+                due_list.append(item_dict)
+            elif 0 < delta_days <= advance:
+                item_dict["due_status"] = f"还剩 {delta_days} 天"
+                item_dict["days_left"] = delta_days
+                due_list.append(item_dict)
+            elif delta_days == -1:
+                item_dict["due_status"] = "已逾期 1 天"
+                item_dict["days_left"] = -1
+                due_list.append(item_dict)
+            # 逾期 1 天以上 (delta_days < -1) 不再纳入提醒视图
 
         due_list.sort(key=lambda x: x.get("days_left", 999))
         return due_list
 
-    def prune_expired_schedules(self, today_str: str):
+    def prune_expired_schedules(self, today_str: str = "", now: datetime | None = None):
         """清理已过期超过 3 天的历史日程"""
+        if now is not None:
+            now_dt = parse_bjt_datetime(now)
+        elif today_str:
+            now_dt = parse_bjt_datetime(today_str)
+        else:
+            now_dt = get_now_bjt()
+
+        today_date = now_dt.date()
         retained = []
         for item in self.data.active_schedules:
-            ev_date = item.event_date.strip()
-            if not ev_date or ev_date >= today_str:
+            ev_date = parse_bjt_datetime(item.event_date).date()
+            if (today_date - ev_date).days <= 3:
                 retained.append(item)
-            else:
-                try:
-                    dt_ev = datetime.strptime(ev_date, "%Y-%m-%d")
-                    dt_now = datetime.strptime(today_str, "%Y-%m-%d")
-                    if (dt_now - dt_ev).days <= 3:
-                        retained.append(item)
-                except (ValueError, TypeError):
-                    pass
         self.data.active_schedules = retained
 
     def get_active_schedules(self) -> list[dict]:
@@ -296,7 +332,7 @@ class InboxMemory:
 
     def save(self):
         """保存日常记忆状态"""
-        self.data.last_run = get_now_bjt().strftime("%Y-%m-%d %H:%M:%S")
+        self.data.last_run = get_now_bjt()
         self.store.save(self.data)
         print(f"[InboxMemory Saved] 状态已成功进行 Fernet 对称加密并保存至: {self.store.filepath}")
 
@@ -340,6 +376,6 @@ class HistoryMemory:
 
     def save(self):
         """保存历史清理记忆状态"""
-        self.data.last_run = get_now_bjt().strftime("%Y-%m-%d %H:%M:%S")
+        self.data.last_run = get_now_bjt()
         self.store.save(self.data)
         print(f"[HistoryMemory Saved] 历史清理状态已成功进行 Fernet 对称加密并保存至: {self.store.filepath}")

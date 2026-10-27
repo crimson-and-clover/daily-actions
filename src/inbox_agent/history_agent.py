@@ -12,7 +12,6 @@ Inbox History Agent (收件箱历史邮件归档与清理智能体)
 4. 与主 agent 共享状态，状态经过 Fernet AES 加密安全保存
 """
 
-import email.utils
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -67,16 +66,9 @@ def main():
         # 2. 应用层安全护栏双重校验：确保邮件发送日期绝对早于截止时间，杜绝服务端时区/解析差异导致的误伤
         raw_old_emails: list[Email] = []
         for e in fetched_emails:
-            date_str = e.date or ""
             try:
-                msg_dt = email.utils.parsedate_to_datetime(date_str)
-                # 统一时区进行防御性比对
-                if msg_dt.tzinfo is not None and cutoff_dt.tzinfo is not None:
-                    is_older = msg_dt < cutoff_dt
-                else:
-                    is_older = msg_dt.replace(tzinfo=None) < cutoff_dt.replace(tzinfo=None)
-                if not is_older:
-                    print(f"[Safety Warning] 发现晚于 90 天阈值的邮件，已安全拦截跳过: '{e.subject}' (日期: {date_str})")
+                if not (e.date < cutoff_dt):
+                    print(f"[Safety Warning] 发现晚于 90 天阈值的邮件，已安全拦截跳过: '{e.subject}' (日期: {e.date_str})")
                     continue
             except Exception:
                 # 无法解析日期时由于已有 IMAP BEFORE 过滤，保留处理

@@ -10,6 +10,8 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
+from utils.timezone import get_now_bjt, parse_bjt_datetime
+
 
 def extract_unsubscribe_link(msg: email.message.EmailMessage, raw_html: str = "") -> str:
     """提取邮件中的一键退订链接 (支持 RFC 2369 List-Unsubscribe 头部以及正文 HTML 链接)"""
@@ -49,7 +51,8 @@ def parse_email_message(raw_bytes: bytes) -> dict[str, Any]:
     subject = str(msg["Subject"] or "无主题")
     from_addr = str(msg["From"] or "未知发件人")
     to_addr = str(msg["To"] or "")
-    date_str = str(msg["Date"] or "")
+    raw_date = msg.get("Date")
+    date_val = parse_bjt_datetime(raw_date) if raw_date else get_now_bjt()
     message_id = str(msg["Message-ID"] or "").strip()
 
     body_text = ""
@@ -103,7 +106,7 @@ def parse_email_message(raw_bytes: bytes) -> dict[str, Any]:
         "subject": subject,
         "from_addr": from_addr,
         "to_addr": to_addr,
-        "date": date_str,
+        "date": date_val,
         "message_id": message_id,
         "body": body_text,
         "raw_html": raw_html,

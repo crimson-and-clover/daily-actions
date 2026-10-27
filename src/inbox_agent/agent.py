@@ -210,9 +210,9 @@ def main():
     run_slot = get_run_slot_name(now_dt)
 
     # 根据大模型提取的 advance_days 提前预警天数，提取今日到期或提前预警的日程待办
-    today_due_schedules = memory.get_due_schedules(today_str=date_str)
+    today_due_schedules = memory.get_due_schedules(now=now_dt)
     # 自动清理历史已逾期超过 3 天的事项，保持活跃日程池干练精炼
-    memory.prune_expired_schedules(today_str=date_str)
+    memory.prune_expired_schedules(now=now_dt)
 
     # -------------------------------------------------------------------------
     # 阶段 6: 邮件简报渲染与通知分发

@@ -3,9 +3,12 @@ IMAP 领域数据模型定义
 包含 LabelSpec 标签规格与 Email 邮件数据模型 (UID 统一为原生 int，基于 Pydantic BaseModel)
 """
 
+from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from utils.timezone import get_now_bjt, parse_bjt_datetime
 
 
 class LabelSpec(BaseModel):
@@ -35,7 +38,7 @@ class Email(BaseModel):
     subject: str
     from_addr: str
     to_addr: str
-    date: str
+    date: datetime
     snippet: str
     body: str
     raw_html: str = ""
@@ -44,8 +47,22 @@ class Email(BaseModel):
     labels: list[str] = Field(default_factory=list)
     codes: list[str] = Field(default_factory=list)
 
+    @field_validator("date", mode="before")
+    @classmethod
+    def _coerce_date(cls, v: Any) -> datetime:
+        if v is None or v == "":
+            return get_now_bjt()
+        return parse_bjt_datetime(v)
+
+    @property
+    def date_str(self) -> str:
+        """返回带 ISO 时区偏移量的格式化字符串，如 2026-10-27 15:30+08:00"""
+        dt = parse_bjt_datetime(self.date)
+        return dt.format("YYYY-MM-DD HH:mmZ")
+
     def to_dict(self) -> dict[str, Any]:
-        """序列化为字典对象 (包含兼容字段 id)"""
+        """序列化为字典对象 (包含兼容字段 id 与格式化 date 字符串)"""
         data = self.model_dump()
         data["id"] = self.uid
+        data["date"] = self.date_str
         return data

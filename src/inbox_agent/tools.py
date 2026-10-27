@@ -5,7 +5,6 @@ Inbox Agent 工具系统 (Tools Definition & Modular Dispatcher)
 
 import hashlib
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 import openai
@@ -21,6 +20,7 @@ from inbox_agent.imap import (
     MessageRepo,
 )
 from inbox_agent.memory import InboxMemory
+from utils.timezone import get_now_bjt, parse_bjt_datetime
 
 # ==============================================================================
 # 1. Pydantic 工具入参模型 (用于自动导出标准 OpenAI Tool Docs)
@@ -215,11 +215,20 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
 
     # 严格真实日历日期校验 (拦截 2026-02-30, 2026-13-01 等非法日期)
     try:
-        datetime.strptime(event_date, "%Y-%m-%d")
-    except ValueError:
+        raw_target = f"{event_date} {args.event_time.strip()}".strip()
+        event_dt = parse_bjt_datetime(raw_target)
+    except Exception:
         return {
             "status": "error",
             "message": f"event_date '{event_date}' 不是合法的日历日期 (格式须为 YYYY-MM-DD 且日期真实存在)",
+        }
+
+    # 强类型基准日校验：若事件日期早于今日（北京时间），防御性拦截加入日程池
+    now_bjt = get_now_bjt()
+    if event_dt.date() < now_bjt.date():
+        return {
+            "status": "ignored",
+            "message": f"日程日期 {event_dt.format('YYYY-MM-DD')} 早于今日基准日 {now_bjt.format('YYYY-MM-DD')}，已过期失效，无需加入日程池",
         }
 
     email_info: dict[str, Any] = {}
@@ -251,7 +260,7 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
         }
 
     # 日程全局唯一 ID 仅跟随 Message-ID + 标题 + 日期派生
-    seed = f"{m_id}|{title}|{event_date}"
+    seed = f"{m_id}|{title}|{event_dt.format('YYYY-MM-DD')}"
     derived_schedule_id = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
 
     schedule_payload = {
@@ -260,7 +269,7 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
         "subject": email_info.get("subject", title),
         "from_addr": email_info.get("from_addr", ""),
         "title": title,
-        "event_date": event_date,
+        "event_date": event_dt,
         "event_time": args.event_time.strip(),
         "timezone": args.timezone.strip() or "Asia/Shanghai",
         "advance_days": args.advance_days,
