@@ -30,14 +30,14 @@ class Email(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    uid: int
-    message_id: str
-    subject: str
-    from_addr: str
-    to_addr: str
-    date: str
-    snippet: str
-    body: str
+    uid: int = 0
+    message_id: str = ""
+    subject: str = ""
+    from_addr: str = ""
+    to_addr: str = ""
+    date: str = ""
+    snippet: str = ""
+    body: str = ""
     raw_html: str = ""
     attachments: list[dict[str, Any]] = Field(default_factory=list)
     unsubscribe_link: str = ""

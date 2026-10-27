@@ -10,6 +10,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from inbox_agent.config import DEEPSEEK_MODEL, DEEPSEEK_TIMEOUT
+from inbox_agent.imap.models import Email
 from utils.json_parser import parse_json_safely
 from utils.prompt_loader import render_prompt_template
 from utils.timezone import get_bjt_date_str, get_bjt_weekday_str
@@ -27,15 +28,15 @@ def build_system_prompt(current_date: str, current_weekday: str) -> str:
     )
 
 
-def classify_email(email_item: dict, api_key: str, my_email: str = "") -> dict:
+def classify_email(email: Email, api_key: str, my_email: str = "") -> dict:
     """
     调用 DeepSeek 大模型对单封邮件进行智能分类与信息抽取
     返回包含分类和结构化字段的字典
     """
-    subject = email_item.get("subject", "无主题")
-    from_addr = email_item.get("from", "未知发件人")
-    date_str = email_item.get("date", "")
-    snippet = email_item.get("snippet", "")
+    subject = email.subject or "无主题"
+    from_addr = email.from_addr or "未知发件人"
+    date_str = email.date or ""
+    snippet = email.snippet or ""
 
     # 1. 硬编码规则：来自自己(me)或项目内部各CI任务通知邮件，直接放入系统通知分类
     my_email_lower = (my_email or "").strip().lower()
@@ -154,15 +155,15 @@ def build_historical_system_prompt(current_date: str, current_weekday: str) -> s
     )
 
 
-def classify_history_email(email_item: dict, api_key: str, my_email: str = "") -> dict:
+def classify_history_email(email: Email, api_key: str, my_email: str = "") -> dict:
     """
     针对 90 天以上历史邮件的大模型决策：
     判断是否删除、是否归档至指定目录，或者因依然具备信息量/日程有效而保留在收件箱。
     """
-    subject = email_item.get("subject", "无主题")
-    from_addr = email_item.get("from", "未知发件人")
-    date_str = email_item.get("date", "")
-    snippet = email_item.get("snippet", "")
+    subject = email.subject or "无主题"
+    from_addr = email.from_addr or "未知发件人"
+    date_str = email.date or ""
+    snippet = email.snippet or ""
 
     client = OpenAI(
         api_key=api_key,

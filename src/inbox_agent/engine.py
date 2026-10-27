@@ -112,8 +112,8 @@ class AgentEngine:
         if tracker:
             tracker.register_batch_emails(batch_emails)
 
-        # 挂载当前批次邮件字典列表至 ToolContext 供各工具即时访问与元数据提取
-        context.current_emails = [e.to_dict() for e in batch_emails]
+        # 挂载当前批次邮件实体列表至 ToolContext 供各工具即时访问与元数据提取
+        context.current_emails = list(batch_emails)
         memory = context.memory
 
         # 建立当前批次 UID -> Message-ID 与垃圾状态映射
