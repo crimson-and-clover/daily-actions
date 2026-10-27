@@ -102,7 +102,7 @@ class AgentEngine:
     ) -> str:
         """
         单批次独立 ReAct 会话运行 (纯净 Email 强类型实体模型)：
-        1. 注入当前批次邮件字典数据至 context.current_emails
+        1. 注入当前批次邮件实体列表至 context.current_emails
         2. 建立基于全局不可变 Message-ID 的状态追踪
         3. 渲染 System 与 User Prompts 开启全新上下文
         4. 进行 ReAct 多轮工具调用闭环与保活
