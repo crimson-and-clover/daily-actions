@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-DEFAULT_MODULES=("market-fx" "paper-agent" "world-news" "reviewer-radar")
+DEFAULT_MODULES=("inbox-agent" "market-fx" "paper-agent" "world-news" "reviewer-radar")
 MODULES=("${@:-${DEFAULT_MODULES[@]}}")
 
 REPO_URL=$(git remote get-url origin 2>/dev/null || true)
@@ -22,8 +22,9 @@ trap 'rm -rf "${TMP_DIR}"' EXIT
 for mod in "${MODULES[@]}"; do
   state_branch="state/${mod}"
 
-  # 1. 检查远端是否已存在该状态分支
-  if git ls-remote --exit-code --heads origin "${state_branch}" >/dev/null 2>&1; then
+  # 1. 检查远端是否已存在该状态分支 (git ls-remote 失败退出码 != 0 直接中断；非空视为分支存在)
+  remote_head=$(git ls-remote --heads "${REPO_URL}" "${state_branch}")
+  if [ -n "${remote_head}" ]; then
     echo "[跳过] 远端已存在 ${state_branch} 分支，保留既有历史状态。"
     continue
   fi
