@@ -15,6 +15,7 @@ import openreview
 import requests
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
+from requests.adapters import HTTPAdapter
 
 from reviewer_radar.ccf_timeline import fetch_conference_targets
 from reviewer_radar.config import FORM_DOMAINS
@@ -33,6 +34,13 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
     )
 }
+
+# 模块级复用 HTTP Session 连接池，降低高频探索下的 TCP/TLS 握手开销
+_HTTP_SESSION = requests.Session()
+_HTTP_ADAPTER = HTTPAdapter(pool_connections=10, pool_maxsize=20, max_retries=2)
+_HTTP_SESSION.mount("https://", _HTTP_ADAPTER)
+_HTTP_SESSION.mount("http://", _HTTP_ADAPTER)
+_HTTP_SESSION.headers.update(HEADERS)
 
 # ==============================================================================
 # 1. ToolContext 上下文载体
@@ -142,10 +150,11 @@ def _handle_fetch_web_links(args: FetchWebLinksArgs, ctx: ToolContext) -> dict[s
     url = args.url
     kw = (args.filter_keyword or "").lower().strip()
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp = _HTTP_SESSION.get(url, timeout=10)
         if resp.status_code != 200:
             return {"status": "error", "message": f"请求页面失败: HTTP {resp.status_code}"}
-        soup = BeautifulSoup(resp.text, "html.parser")
+        # 采用原生二进制 content，由 BeautifulSoup 自动探测编码解析
+        soup = BeautifulSoup(resp.content, "html.parser")
         links: list[WebLinkItem] = []
         seen = set()
 
@@ -182,14 +191,15 @@ def _handle_read_page_content(args: ReadPageContentArgs, ctx: ToolContext) -> di
     url = args.url
     max_chars = args.max_chars
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp = _HTTP_SESSION.get(url, timeout=10)
         if resp.status_code != 200:
             return {"status": "error", "message": f"请求正文失败: HTTP {resp.status_code}"}
 
-        soup = BeautifulSoup(resp.text, "html.parser")
+        # 优先使用原生二进制 content，由 BeautifulSoup 内置的 UnicodeDammit 自动探测编码，彻底解决 ISO-8859-1 乱码问题
+        soup = BeautifulSoup(resp.content, "html.parser")
         title = soup.title.string.strip() if soup.title and soup.title.string else ""
 
-        # 剔除无用标签
+        # 剔除无用脚本与导航标签
         for tag in soup(["script", "style", "nav", "footer", "header"]):
             tag.decompose()
 
@@ -216,18 +226,19 @@ def _handle_read_page_content(args: ReadPageContentArgs, ctx: ToolContext) -> di
             if is_form_host or is_form_path:
                 detected_forms.add(abs_url)
 
-        # 辅助短链正则匹配 (针对正文纯文本提及但未包装 <a> 标签的短链)
+        # 辅助短链正则匹配 (基于经过编码探测与清洗后的安全 HTML 文本，避免脚本干扰与乱码)
+        cleaned_html = str(soup)
         form_patterns = [
             r"https?://(?:forms\.gle|t\.co)/[^\s\"'<>]+",
         ]
         for pat in form_patterns:
-            for match in re.findall(pat, resp.text):
+            for match in re.findall(pat, cleaned_html):
                 detected_forms.add(match)
 
-        # 嗅探联系邮箱
+        # 嗅探联系邮箱 (从已清洗的 HTML 文本中提取，避开 script 内部假变量)
         detected_emails = set()
         email_pattern = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
-        for em in re.findall(email_pattern, resp.text):
+        for em in re.findall(email_pattern, cleaned_html):
             if not any(ign in em.lower() for ign in ["example.com", "wixpress.com", "domain.com", "sentry.io", "github.com"]):
                 detected_emails.add(em)
 

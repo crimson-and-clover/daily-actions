@@ -42,6 +42,10 @@ TRACKED_CONFERENCE_CONFIGS: list[dict[str, Any]] = [
 
 RAW_BASE_URL = "https://raw.githubusercontent.com/ccfddl/ccf-deadlines/main/conference"
 
+# 模块级复用 HTTP 连接池，14 场会务配置在同一 Session 上快速复用 HTTPS 握手
+_CCF_SESSION = requests.Session()
+_CCF_SESSION.headers.update({"User-Agent": "ReviewerRadar/1.0"})
+
 
 def _parse_iso_date(val: Any) -> str | None:
     """从 CCF-DDL 原始文本字段提取标准的 YYYY-MM-DD 日期，自动过滤空值与待定 TBD"""
@@ -118,9 +122,12 @@ def parse_ccf_yaml_content(text: str) -> CcfConferenceSeries:
     reraise=True,
 )
 def _fetch_yaml_text(url: str) -> str:
-    """带重试保护的 CCF-DDL 远程 YAML 数据拉取"""
-    resp = requests.get(url, headers={"User-Agent": "ReviewerRadar/1.0"}, timeout=8)
+    """带重试保护与 Session 连接池复用的 CCF-DDL 远程 YAML 数据拉取"""
+    resp = _CCF_SESSION.get(url, timeout=8)
     resp.raise_for_status()
+    # 强制以 UTF-8 读取 GitHub Raw YAML 文本，规避 requests 默认将未带 charset 响应回退为 ISO-8859-1 的乱码缺陷
+    if not resp.encoding or resp.encoding.lower() == "iso-8859-1":
+        resp.encoding = "utf-8"
     return resp.text
 
 
