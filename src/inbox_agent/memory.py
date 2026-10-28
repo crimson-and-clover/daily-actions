@@ -30,6 +30,8 @@ class ScheduleItem(BaseModel):
     action_items: list[str] = Field(default_factory=list)
     event_date: datetime
     event_time: str = ""
+    start_time: str = ""
+    end_time: str = ""
     timezone: str = "Asia/Shanghai"  # 酒店、航班等跨时区行程明确时区（如 Asia/Tokyo, America/New_York）
     advance_days: int = 3
     priority: str = "P1"
@@ -201,23 +203,34 @@ class EncryptedStore:
                     except Exception:
                         continue
 
-                    # 补齐/规范化 added_at 与 updated_at 时间戳
-                    for ts_field in ("added_at", "updated_at"):
-                        ts_val = item.get(ts_field)
-                        if not ts_val or not str(ts_val).strip():
-                            item[ts_field] = now_iso
-                        else:
-                            try:
-                                item[ts_field] = parse_bjt_datetime(ts_val).isoformat()
-                            except Exception:
-                                item[ts_field] = now_iso
+                    # 补齐/规范化 added_at (必填时间戳，缺失补当前时间)
+                    added_val = item.get("added_at")
+                    if not added_val or not str(added_val).strip():
+                        item["added_at"] = now_iso
+                    else:
+                        try:
+                            item["added_at"] = parse_bjt_datetime(added_val).isoformat()
+                        except Exception:
+                            item["added_at"] = now_iso
+
+                    # 规范化 updated_at (可选时间戳，缺失时保持 None 绝不误标为刚更新)
+                    updated_val = item.get("updated_at")
+                    if updated_val and str(updated_val).strip():
+                        try:
+                            item["updated_at"] = parse_bjt_datetime(updated_val).isoformat()
+                        except Exception:
+                            item["updated_at"] = None
+                    else:
+                        item["updated_at"] = None
 
                     # 兼容解耦旧版 event_time (若为 09:30-11:30 区间自动拆分为 start_time/end_time)
                     old_time = str(item.get("event_time") or "").strip()
-                    if old_time and "-" in old_time and not item.get("start_time"):
+                    if old_time and "-" in old_time:
                         parts = old_time.split("-", 1)
-                        item["start_time"] = parts[0].strip()
-                        item["end_time"] = parts[1].strip()
+                        if not item.get("start_time"):
+                            item["start_time"] = parts[0].strip()
+                        if not item.get("end_time"):
+                            item["end_time"] = parts[1].strip()
                     elif old_time and not item.get("start_time"):
                         item["start_time"] = old_time
 
