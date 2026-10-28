@@ -162,22 +162,34 @@ class EncryptedStore:
             raw_dict["active_schedules"] = [s.model_dump(mode="json") for s in valid_schedules]
 
         try:
-            return model_cls.model_validate(raw_dict)
+            instance = model_cls.model_validate(raw_dict)
+            if hasattr(instance, "active_schedules") and valid_schedules:
+                instance.active_schedules = valid_schedules
+            return instance
         except Exception as e:
             print(f"[Memory Warning] 状态数据顶层校验异常 ({e})，启动最大化数据挽救兜底降级", file=sys.stderr)
             fallback_instance = model_cls()
             if isinstance(raw_dict, dict):
-                # 尽全力保留历史已处理 message_id 列表，绝不重复处理
+                # 尽全力保留历史已处理与垃圾拦截 message_id 列表，绝不重复处理
                 if hasattr(fallback_instance, "processed_message_ids") and "processed_message_ids" in raw_dict:
                     fallback_instance.processed_message_ids = [str(x) for x in raw_dict.get("processed_message_ids", []) if x]
                 if hasattr(fallback_instance, "history_processed_ids") and "history_processed_ids" in raw_dict:
                     fallback_instance.history_processed_ids = [str(x) for x in raw_dict.get("history_processed_ids", []) if x]
+                if hasattr(fallback_instance, "spam_message_ids") and "spam_message_ids" in raw_dict:
+                    fallback_instance.spam_message_ids = [str(x) for x in raw_dict.get("spam_message_ids", []) if x]
+                if hasattr(fallback_instance, "created_draft_ids") and "created_draft_ids" in raw_dict:
+                    fallback_instance.created_draft_ids = [str(x) for x in raw_dict.get("created_draft_ids", []) if x]
                 # 挽救已通过校验的有效日程池与统计计数，绝不丢失
                 if hasattr(fallback_instance, "active_schedules") and valid_schedules:
                     fallback_instance.active_schedules = valid_schedules
                 if hasattr(fallback_instance, "total_processed") and "total_processed" in raw_dict:
                     try:
                         fallback_instance.total_processed = int(raw_dict.get("total_processed", 0))
+                    except Exception:
+                        pass
+                if hasattr(fallback_instance, "total_spam_filtered") and "total_spam_filtered" in raw_dict:
+                    try:
+                        fallback_instance.total_spam_filtered = int(raw_dict.get("total_spam_filtered", 0))
                     except Exception:
                         pass
             return fallback_instance
