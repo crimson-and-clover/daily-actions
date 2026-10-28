@@ -36,8 +36,8 @@ for mod in "${MODULES[@]}"; do
   pushd "${WORK_DIR}" > /dev/null
 
   git init -q
-  git config user.name "$(git -C "${OLDPWD}" config user.name 2>/dev/null || echo 'github-actions[bot]')"
-  git config user.email "$(git -C "${OLDPWD}" config user.email 2>/dev/null || echo '41898282+github-actions[bot]@users.noreply.github.com')"
+  git config user.name "github-actions[bot]"
+  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
   git remote add origin "${REPO_URL}"
   git checkout --orphan "${state_branch}" -q
 
