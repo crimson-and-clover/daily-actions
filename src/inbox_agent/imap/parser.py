@@ -52,10 +52,16 @@ def parse_email_message(raw_bytes: bytes) -> dict[str, Any]:
     from_addr = str(msg["From"] or "未知发件人")
     to_addr = str(msg["To"] or "")
     raw_date = msg.get("Date")
-    try:
-        date_val = parse_bjt_datetime(raw_date, fallback=get_now_bjt()) if raw_date else get_now_bjt()
-    except Exception:
-        # 防御垃圾邮件、非法头部等畸形 Date 格式，安全降级为当前北京时间
+    raw_date_str = str(raw_date or "").strip()
+    date_parsed = False
+    if raw_date_str:
+        try:
+            date_val = parse_bjt_datetime(raw_date_str)
+            date_parsed = True
+        except Exception:
+            # 防御垃圾邮件、非法头部等畸形 Date 格式，安全降级为当前北京时间
+            date_val = get_now_bjt()
+    else:
         date_val = get_now_bjt()
     message_id = str(msg["Message-ID"] or "").strip()
 
@@ -111,6 +117,8 @@ def parse_email_message(raw_bytes: bytes) -> dict[str, Any]:
         "from_addr": from_addr,
         "to_addr": to_addr,
         "date": date_val,
+        "raw_date": raw_date_str,
+        "date_parsed": date_parsed,
         "message_id": message_id,
         "body": body_text,
         "raw_html": raw_html,

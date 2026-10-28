@@ -12,7 +12,7 @@ from imapclient.imap_utf7 import decode as utf7_decode
 
 from inbox_agent.imap.connection import ImapConnection
 from inbox_agent.imap.labels import LABEL_SPECS, labels_to_codes
-from inbox_agent.imap.models import Email
+from inbox_agent.imap.models import Email, EmailContentResult
 from inbox_agent.imap.parser import parse_email_message
 
 
@@ -89,6 +89,8 @@ class MessageRepo:
                     from_addr=parsed["from_addr"],
                     to_addr=parsed["to_addr"],
                     date=parsed["date"],
+                    raw_date=parsed.get("raw_date", ""),
+                    date_parsed=parsed.get("date_parsed", True),
                     snippet=parsed["body"][:1000],
                     body=parsed["body"],
                     raw_html=parsed["raw_html"],
@@ -131,21 +133,22 @@ class MessageRepo:
             )
             truncated = True
 
-        return {
-            "status": "success",
-            "uid": email_uid,
-            "code": code,
-            "folder": folder,
-            "subject": parsed["subject"],
-            "from_addr": parsed["from_addr"],
-            "to_addr": parsed["to_addr"],
-            "date": parsed["date"],
-            "message_id": parsed["message_id"],
-            "body": body_text,
-            "attachments": parsed["attachments"],
-            "unsubscribe_link": parsed["unsubscribe_link"],
-            "truncated": truncated,
-        }
+        content_model = EmailContentResult(
+            status="success",
+            uid=email_uid,
+            code=code,
+            folder=folder,
+            subject=parsed["subject"],
+            from_addr=parsed["from_addr"],
+            to_addr=parsed["to_addr"],
+            date=parsed["date"],
+            message_id=parsed["message_id"],
+            body=body_text,
+            attachments=parsed["attachments"],
+            unsubscribe_link=parsed["unsubscribe_link"],
+            truncated=truncated,
+        )
+        return content_model.model_dump(mode="json")
 
     def get_email_by_message_id(
         self,
@@ -249,6 +252,8 @@ class MessageRepo:
                     from_addr=parsed["from_addr"],
                     to_addr=parsed["to_addr"],
                     date=parsed["date"],
+                    raw_date=parsed.get("raw_date", ""),
+                    date_parsed=parsed.get("date_parsed", True),
                     snippet=parsed["body"][:1000],
                     body=parsed["body"],
                     raw_html=parsed["raw_html"],

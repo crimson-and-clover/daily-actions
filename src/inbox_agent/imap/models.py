@@ -6,7 +6,7 @@ IMAP 领域数据模型定义
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from utils.timezone import get_now_bjt, parse_bjt_datetime
 
@@ -28,6 +28,31 @@ class LabelSpec(BaseModel):
     folder_name: str
 
 
+class EmailContentResult(BaseModel):
+    """邮件完整详情模型 (Pydantic 严格校验与确定性序列化)"""
+
+    model_config = ConfigDict(frozen=True)
+
+    status: str = "success"
+    uid: int
+    code: str
+    folder: str
+    subject: str
+    from_addr: str
+    to_addr: str
+    date: datetime
+    message_id: str
+    body: str
+    attachments: list[dict[str, Any]] = Field(default_factory=list)
+    unsubscribe_link: str = ""
+    truncated: bool = False
+
+    @field_serializer("date", mode="plain")
+    def _serialize_date(self, dt: datetime) -> str:
+        """统一序列化为带 ISO 时区偏移的标准字符串，避免裸 DateTime 进入 json 序列化链路"""
+        return parse_bjt_datetime(dt).format("YYYY-MM-DD HH:mmZ")
+
+
 class Email(BaseModel):
     """邮件领域模型实体 (UID 统一为原生 int)"""
 
@@ -39,6 +64,8 @@ class Email(BaseModel):
     from_addr: str
     to_addr: str
     date: datetime
+    raw_date: str = ""
+    date_parsed: bool = True
     snippet: str
     body: str
     raw_html: str = ""
@@ -57,6 +84,10 @@ class Email(BaseModel):
         except Exception:
             return get_now_bjt()
 
+    @field_serializer("date", mode="plain")
+    def _serialize_date(self, dt: datetime) -> str:
+        return self.date_str
+
     @property
     def date_str(self) -> str:
         """返回带 ISO 时区偏移量的格式化字符串，如 2026-10-27 15:30+08:00"""
@@ -65,7 +96,7 @@ class Email(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为字典对象 (包含兼容字段 id 与格式化 date 字符串)"""
-        data = self.model_dump()
+        data = self.model_dump(mode="json")
         data["id"] = self.uid
         data["date"] = self.date_str
         return data

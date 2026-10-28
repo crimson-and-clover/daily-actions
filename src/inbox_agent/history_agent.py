@@ -66,13 +66,11 @@ def main():
         # 2. 应用层安全护栏双重校验：确保邮件发送日期绝对早于截止时间，杜绝服务端时区/解析差异导致的误伤
         raw_old_emails: list[Email] = []
         for e in fetched_emails:
-            try:
-                if not (e.date < cutoff_dt):
-                    print(f"[Safety Warning] 发现晚于 90 天阈值的邮件，已安全拦截跳过: '{e.subject}' (日期: {e.date_str})")
-                    continue
-            except Exception:
-                # 无法解析日期时由于已有 IMAP BEFORE 过滤，保留处理
-                pass
+            # 应用层双重校验：只有在邮件日期成功解析确认为晚于 90 天阈值时才拦截；
+            # 若原始头缺失或解析失败，说明无法在应用层准确比对，放行交由 IMAP BEFORE 服务端过滤兜底，杜绝形成永久跳过的“僵尸邮件”
+            if e.date_parsed and not (e.date < cutoff_dt):
+                print(f"[Safety Warning] 发现晚于 90 天阈值的邮件，已安全拦截跳过: '{e.subject}' (日期: {e.date_str})")
+                continue
             raw_old_emails.append(e)
 
         print(f"[IMAP] 抓取并核验待研判历史邮件: {len(raw_old_emails)} 封")
