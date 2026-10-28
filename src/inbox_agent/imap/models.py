@@ -52,7 +52,10 @@ class Email(BaseModel):
     def _coerce_date(cls, v: Any) -> datetime:
         if v is None or v == "":
             return get_now_bjt()
-        return parse_bjt_datetime(v)
+        try:
+            return parse_bjt_datetime(v, fallback=get_now_bjt())
+        except Exception:
+            return get_now_bjt()
 
     @property
     def date_str(self) -> str:

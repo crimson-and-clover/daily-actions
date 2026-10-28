@@ -22,10 +22,11 @@ def get_now_bjt() -> DateTime:
     return pendulum.now(BJT_TIMEZONE_NAME)
 
 
-def parse_bjt_datetime(val: Any, default_tz: str = BJT_TIMEZONE_NAME) -> DateTime:
+def parse_bjt_datetime(val: Any, default_tz: str = BJT_TIMEZONE_NAME, fallback: DateTime | None = None) -> DateTime:
     """
     智能解析任意输入（ISO-8601 字符串、RFC 2822、标准 datetime、date 等）并转换为带时区的 DateTime 实体。
     如果输入不含时区信息，默认绑定 default_tz (Asia/Shanghai)。
+    若解析失败且指定了 fallback，则返回 fallback；否则向外抛出异常。
     """
     if isinstance(val, DateTime):
         return val.in_timezone(default_tz)
@@ -40,6 +41,8 @@ def parse_bjt_datetime(val: Any, default_tz: str = BJT_TIMEZONE_NAME) -> DateTim
 
     val_str = str(val).strip()
     if not val_str:
+        if fallback is not None:
+            return fallback
         return get_now_bjt()
 
     # 1. 优先尝试 pendulum 的高效自适应解析
@@ -53,12 +56,17 @@ def parse_bjt_datetime(val: Any, default_tz: str = BJT_TIMEZONE_NAME) -> DateTim
         pass
 
     # 2. 回退到 dateutil 模糊解析以防极端边缘字符串
-    dt = dateutil_parser.parse(val_str)
-    if dt.tzinfo is None:
-        return pendulum.datetime(
-            dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.microsecond, tz=default_tz
-        )
-    return pendulum.instance(dt).in_timezone(default_tz)
+    try:
+        dt = dateutil_parser.parse(val_str)
+        if dt.tzinfo is None:
+            return pendulum.datetime(
+                dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.microsecond, tz=default_tz
+            )
+        return pendulum.instance(dt).in_timezone(default_tz)
+    except Exception:
+        if fallback is not None:
+            return fallback
+        raise
 
 
 def get_bjt_date_str(fmt: str = "%Y-%m-%d") -> str:

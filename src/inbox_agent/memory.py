@@ -1,3 +1,4 @@
+import json
 import sys
 import uuid
 from datetime import datetime
@@ -40,7 +41,9 @@ class ScheduleItem(BaseModel):
     @field_validator("event_date", mode="before")
     @classmethod
     def _coerce_event_date(cls, v: Any) -> datetime:
-        return parse_bjt_datetime(v)
+        if v is None or (isinstance(v, str) and not v.strip()):
+            raise ValueError("event_date 不能为空，日程必须绑定具体日期")
+        return parse_bjt_datetime(v).start_of("day")
 
     @field_validator("added_at", "updated_at", mode="before")
     @classmethod
@@ -116,7 +119,7 @@ class EncryptedStore:
                 print("[Security Warning] 未检测到 INBOX_STATE_KEY，状态将无法加密持久化", file=sys.stderr)
 
     def load[T: BaseModel](self, model_cls: type[T]) -> T:
-        """从磁盘解密加载 Pydantic 状态数据，若文件损坏或采用新架构则初始化全新状态"""
+        """从磁盘解密加载 Pydantic 状态数据，支持旧版 Schema 平滑升级与脏数据容错"""
         if not self.filepath.exists():
             return model_cls()
 
@@ -132,13 +135,49 @@ class EncryptedStore:
                 return model_cls()
             decrypted_bytes = self.fernet.decrypt(encrypted_bytes)
             json_str = decrypted_bytes.decode("utf-8")
-            return model_cls.model_validate_json(json_str)
+            raw_dict = json.loads(json_str)
         except InvalidToken:
             print(f"[Memory Security Error] 密钥不匹配或数据已被篡改: {self.filepath}，直接初始化全新状态", file=sys.stderr)
             return model_cls()
         except Exception as e:
-            print(f"[Memory Warning] 读取或解析状态文件异常 ({e})，按照破坏性升级规则重置为全新状态", file=sys.stderr)
+            print(f"[Memory Warning] 读取或解密状态文件异常 ({e})，按照破坏性升级规则重置为全新状态", file=sys.stderr)
             return model_cls()
+
+        # 平滑版本迁移与脏数据清洗 (防止个别日程字段报错引发整库清空)
+        if isinstance(raw_dict, dict):
+            version = raw_dict.get("version", 1)
+            if version < 2:
+                print(f"[Memory Migration] 检测到旧版本状态 (Schema v{version})，启动平滑升级至 Schema v2...", file=sys.stderr)
+                if "active_schedules" in raw_dict and isinstance(raw_dict["active_schedules"], list):
+                    cleaned_schedules = []
+                    for item in raw_dict["active_schedules"]:
+                        if not isinstance(item, dict):
+                            continue
+                        ev_date = item.get("event_date")
+                        if not ev_date or not str(ev_date).strip():
+                            # 跳过无日期的历史无效条目
+                            continue
+                        try:
+                            # 规范化归一化旧日期格式
+                            item["event_date"] = parse_bjt_datetime(ev_date).start_of("day").isoformat()
+                            cleaned_schedules.append(item)
+                        except Exception:
+                            continue
+                    raw_dict["active_schedules"] = cleaned_schedules
+                raw_dict["version"] = 2
+
+        try:
+            return model_cls.model_validate(raw_dict)
+        except Exception as e:
+            print(f"[Memory Warning] 状态数据模型校验异常 ({e})，尝试提取已处理邮件 ID 兜底降级", file=sys.stderr)
+            fallback_instance = model_cls()
+            if isinstance(raw_dict, dict):
+                # 尽全力保留历史已处理 message_id 列表，绝不重复处理
+                if hasattr(fallback_instance, "processed_message_ids") and "processed_message_ids" in raw_dict:
+                    fallback_instance.processed_message_ids = [str(x) for x in raw_dict.get("processed_message_ids", []) if x]
+                if hasattr(fallback_instance, "history_processed_ids") and "history_processed_ids" in raw_dict:
+                    fallback_instance.history_processed_ids = [str(x) for x in raw_dict.get("history_processed_ids", []) if x]
+            return fallback_instance
 
     def save(self, model: BaseModel):
         """将 Pydantic 状态模型进行 Fernet 加密并持久化到磁盘"""
@@ -199,18 +238,22 @@ class InboxMemory:
 
     def add_schedule(self, schedule_item: ScheduleItem | dict) -> ScheduleItem | None:
         """将包含具体日期 (event_date) 的日程保存到待办日历池中，按 schedule_id 或 (message_id + title + event_date) 覆盖去重"""
-        if isinstance(schedule_item, dict):
-            title = schedule_item.get("title") or schedule_item.get("subject") or "未命名日程"
-            payload = {**schedule_item, "title": title}
-            item = ScheduleItem.model_validate(payload)
-        else:
-            item = schedule_item
+        try:
+            if isinstance(schedule_item, dict):
+                title = schedule_item.get("title") or schedule_item.get("subject") or "未命名日程"
+                payload = {**schedule_item, "title": title}
+                item = ScheduleItem.model_validate(payload)
+            else:
+                item = schedule_item
+        except Exception as e:
+            print(f"[Memory Warning] 日程数据非法，跳过加入待办池: {e}", file=sys.stderr)
+            return None
 
-        item_ev_date = parse_bjt_datetime(item.event_date)
+        item_ev_date = parse_bjt_datetime(item.event_date).start_of("day")
 
         # 依据 schedule_id 或 (message_id + title + event_date) 查重与就地覆盖更新
         for existing in self.data.active_schedules:
-            existing_ev_date = parse_bjt_datetime(existing.event_date)
+            existing_ev_date = parse_bjt_datetime(existing.event_date).start_of("day")
             same_date = existing_ev_date.date() == item_ev_date.date()
             match = False
             if item.schedule_id and existing.schedule_id == item.schedule_id:
@@ -259,12 +302,12 @@ class InboxMemory:
         today_date = now_dt.date()
         due_list = []
         for item in self.data.active_schedules:
-            ev_dt = parse_bjt_datetime(item.event_date)
+            ev_dt = parse_bjt_datetime(item.event_date).start_of("day")
             ev_date = ev_dt.date()
             delta_days = (ev_date - today_date).days
             advance = item.advance_days
 
-            item_dict = item.model_dump(by_alias=True)
+            item_dict = item.model_dump(mode="json", by_alias=True)
             item_dict["event_date"] = ev_dt.format("YYYY-MM-DD")
             if delta_days == 0:
                 item_dict["due_status"] = "今天到期"
@@ -301,8 +344,11 @@ class InboxMemory:
         self.data.active_schedules = retained
 
     def get_active_schedules(self) -> list[dict]:
-        """获取当前所有活跃待办日程"""
-        return [item.model_dump(by_alias=True) for item in self.data.active_schedules]
+        """获取当前所有活跃待办日程 (返回 JSON-safe 字典，防止进入 json.dumps 时因 DateTime 导致 TypeError)"""
+        return [
+            {**item.model_dump(mode="json", by_alias=True), "event_date": item.event_date_str}
+            for item in self.data.active_schedules
+        ]
 
     def remove_schedule(self, schedule_id: str) -> bool:
         """根据唯一 schedule_id 明确移除指定日程条目，返回是否成功删除"""
@@ -324,7 +370,7 @@ class InboxMemory:
         removed = []
         for item in self.data.active_schedules:
             if item.message_id == target_msg_id:
-                removed.append(item.model_dump(by_alias=True))
+                removed.append({**item.model_dump(mode="json", by_alias=True), "event_date": item.event_date_str})
             else:
                 retained.append(item)
         self.data.active_schedules = retained
