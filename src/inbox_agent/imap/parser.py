@@ -44,25 +44,67 @@ def extract_unsubscribe_link(msg: email.message.EmailMessage, raw_html: str = ""
     return ""
 
 
-def parse_email_message(raw_bytes: bytes) -> dict[str, Any]:
-    """基于 modern email policy 与 BeautifulSoup 解析原始邮件报文，返回结构化字典"""
+def parse_email_message(
+    raw_bytes: bytes,
+    internal_date: Any | None = None,
+) -> dict[str, Any]:
+    """基于 modern email policy 与 BeautifulSoup 解析原始邮件报文，返回结构化字典
+
+    收件时间确认策略（官方标准规范，完全不依赖发件人可篡改的 Date 标头）：
+    1. 优先采用 IMAP RFC 3501 原生 INTERNALDATE（由 imapclient 自动解析为 datetime）
+    2. 报文层采用 RFC 5322 最顶层 Received: 标头（最终收件网关盖戳时间戳）
+    3. 极端情况下降级尝试发件人 Date: 标头
+    4. 全部缺失时降级为当前北京时间，并显式标记 date_parsed = False
+    """
     msg = email.message_from_bytes(raw_bytes, policy=policy.default)
 
     subject = str(msg["Subject"] or "无主题")
     from_addr = str(msg["From"] or "未知发件人")
     to_addr = str(msg["To"] or "")
-    raw_date = msg.get("Date")
-    raw_date_str = str(raw_date or "").strip()
+
+    date_val = None
     date_parsed = False
-    if raw_date_str:
+    raw_date_str = ""
+
+    # 1. 优先使用 IMAP 原生 INTERNALDATE
+    if internal_date is not None:
         try:
-            date_val = parse_bjt_datetime(raw_date_str)
+            date_val = parse_bjt_datetime(internal_date)
             date_parsed = True
+            raw_date_str = str(internal_date)
         except Exception:
-            # 防御垃圾邮件、非法头部等畸形 Date 格式，安全降级为当前北京时间
-            date_val = get_now_bjt()
-    else:
+            date_val = None
+
+    # 2. 报文层使用最顶层 Received: 标头末尾的接收时间戳 (RFC 5322)
+    if date_val is None:
+        received_headers = msg.get_all("Received") or []
+        for recv_h in received_headers:
+            recv_str = str(recv_h).strip()
+            if ";" in recv_str:
+                time_part = recv_str.split(";")[-1].strip()
+                try:
+                    date_val = parse_bjt_datetime(time_part)
+                    date_parsed = True
+                    raw_date_str = time_part
+                    break
+                except Exception:
+                    continue
+
+    # 3. 降级使用发件人 Date: 标头
+    if date_val is None:
+        raw_date = msg.get("Date")
+        raw_date_str = str(raw_date or "").strip()
+        if raw_date_str:
+            try:
+                date_val = parse_bjt_datetime(raw_date_str)
+                date_parsed = True
+            except Exception:
+                date_val = None
+
+    # 4. 全部失败，安全兜底为当前时间并标记未成功解析
+    if date_val is None:
         date_val = get_now_bjt()
+        date_parsed = False
     message_id = str(msg["Message-ID"] or "").strip()
 
     body_text = ""

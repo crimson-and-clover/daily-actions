@@ -6,7 +6,7 @@ IMAP 领域数据模型定义
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
 from utils.timezone import get_now_bjt, parse_bjt_datetime
 
@@ -73,6 +73,27 @@ class Email(BaseModel):
     unsubscribe_link: str = ""
     labels: list[str] = Field(default_factory=list)
     codes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_date_and_parsed(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "date" in data:
+            raw_v = data.get("date")
+            has_explicit_parsed = "date_parsed" in data
+            if raw_v is None or raw_v == "":
+                data["date"] = get_now_bjt()
+                if not has_explicit_parsed:
+                    data["date_parsed"] = False
+            elif not isinstance(raw_v, datetime):
+                try:
+                    data["date"] = parse_bjt_datetime(raw_v)
+                    if not has_explicit_parsed:
+                        data["date_parsed"] = True
+                except Exception:
+                    data["date"] = get_now_bjt()
+                    if not has_explicit_parsed:
+                        data["date_parsed"] = False
+        return data
 
     @field_validator("date", mode="before")
     @classmethod

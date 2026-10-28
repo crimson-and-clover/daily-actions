@@ -143,33 +143,26 @@ class EncryptedStore:
             print(f"[Memory Warning] 读取或解密状态文件异常 ({e})，按照破坏性升级规则重置为全新状态", file=sys.stderr)
             return model_cls()
 
-        # 平滑版本迁移与脏数据清洗 (防止个别日程字段报错引发整库清空)
+        # 显式版本迁移与平滑升级管道
         if isinstance(raw_dict, dict):
-            version = raw_dict.get("version", 1)
-            if version < 2:
-                print(f"[Memory Migration] 检测到旧版本状态 (Schema v{version})，启动平滑升级至 Schema v2...", file=sys.stderr)
-                if "active_schedules" in raw_dict and isinstance(raw_dict["active_schedules"], list):
-                    cleaned_schedules = []
-                    for item in raw_dict["active_schedules"]:
-                        if not isinstance(item, dict):
-                            continue
-                        ev_date = item.get("event_date")
-                        if not ev_date or not str(ev_date).strip():
-                            # 跳过无日期的历史无效条目
-                            continue
-                        try:
-                            # 规范化归一化旧日期格式
-                            item["event_date"] = parse_bjt_datetime(ev_date).start_of("day").isoformat()
-                            cleaned_schedules.append(item)
-                        except Exception:
-                            continue
-                    raw_dict["active_schedules"] = cleaned_schedules
-                raw_dict["version"] = 2
+            raw_dict = self._migrate_to_latest(raw_dict)
+
+        # 待办日程条目级容错隔离 (防止单条损坏条目清空整库)
+        valid_schedules: list[ScheduleItem] = []
+        if isinstance(raw_dict, dict) and "active_schedules" in raw_dict and isinstance(raw_dict["active_schedules"], list):
+            for s_raw in raw_dict["active_schedules"]:
+                if not isinstance(s_raw, dict):
+                    continue
+                try:
+                    valid_schedules.append(ScheduleItem.model_validate(s_raw))
+                except Exception as ex:
+                    print(f"[Memory Warning] 跳过格式损坏的历史日程条目 ({ex})", file=sys.stderr)
+            raw_dict["active_schedules"] = [s.model_dump(mode="json") for s in valid_schedules]
 
         try:
             return model_cls.model_validate(raw_dict)
         except Exception as e:
-            print(f"[Memory Warning] 状态数据模型校验异常 ({e})，尝试提取已处理邮件 ID 兜底降级", file=sys.stderr)
+            print(f"[Memory Warning] 状态数据顶层校验异常 ({e})，启动最大化数据挽救兜底降级", file=sys.stderr)
             fallback_instance = model_cls()
             if isinstance(raw_dict, dict):
                 # 尽全力保留历史已处理 message_id 列表，绝不重复处理
@@ -177,7 +170,69 @@ class EncryptedStore:
                     fallback_instance.processed_message_ids = [str(x) for x in raw_dict.get("processed_message_ids", []) if x]
                 if hasattr(fallback_instance, "history_processed_ids") and "history_processed_ids" in raw_dict:
                     fallback_instance.history_processed_ids = [str(x) for x in raw_dict.get("history_processed_ids", []) if x]
+                # 挽救已通过校验的有效日程池与统计计数，绝不丢失
+                if hasattr(fallback_instance, "active_schedules") and valid_schedules:
+                    fallback_instance.active_schedules = valid_schedules
+                if hasattr(fallback_instance, "total_processed") and "total_processed" in raw_dict:
+                    try:
+                        fallback_instance.total_processed = int(raw_dict.get("total_processed", 0))
+                    except Exception:
+                        pass
             return fallback_instance
+
+    @staticmethod
+    def _migrate_to_latest(raw_dict: dict[str, Any]) -> dict[str, Any]:
+        """状态版本显式升级管道 (Schema v1 -> v2)"""
+        version = raw_dict.get("version", 1)
+        if version < 2:
+            print(f"[Memory Migration] 检测到旧版本状态 (Schema v{version})，启动平滑升级至 Schema v2...", file=sys.stderr)
+            if "active_schedules" in raw_dict and isinstance(raw_dict["active_schedules"], list):
+                cleaned_schedules = []
+                now_iso = get_now_bjt().isoformat()
+                for item in raw_dict["active_schedules"]:
+                    if not isinstance(item, dict):
+                        continue
+                    ev_date = item.get("event_date")
+                    if not ev_date or not str(ev_date).strip():
+                        continue
+                    try:
+                        # 规范化旧日期格式
+                        item["event_date"] = parse_bjt_datetime(ev_date).start_of("day").isoformat()
+                    except Exception:
+                        continue
+
+                    # 补齐/规范化 added_at 与 updated_at 时间戳
+                    for ts_field in ("added_at", "updated_at"):
+                        ts_val = item.get(ts_field)
+                        if not ts_val or not str(ts_val).strip():
+                            item[ts_field] = now_iso
+                        else:
+                            try:
+                                item[ts_field] = parse_bjt_datetime(ts_val).isoformat()
+                            except Exception:
+                                item[ts_field] = now_iso
+
+                    # 兼容解耦旧版 event_time (若为 09:30-11:30 区间自动拆分为 start_time/end_time)
+                    old_time = str(item.get("event_time") or "").strip()
+                    if old_time and "-" in old_time and not item.get("start_time"):
+                        parts = old_time.split("-", 1)
+                        item["start_time"] = parts[0].strip()
+                        item["end_time"] = parts[1].strip()
+                    elif old_time and not item.get("start_time"):
+                        item["start_time"] = old_time
+
+                    cleaned_schedules.append(item)
+                raw_dict["active_schedules"] = cleaned_schedules
+
+            # last_run 字符串升级为规范时间戳
+            if "last_run" in raw_dict and isinstance(raw_dict["last_run"], str):
+                try:
+                    raw_dict["last_run"] = parse_bjt_datetime(raw_dict["last_run"]).isoformat()
+                except Exception:
+                    raw_dict["last_run"] = get_now_bjt().isoformat()
+
+            raw_dict["version"] = 2
+        return raw_dict
 
     def save(self, model: BaseModel):
         """将 Pydantic 状态模型进行 Fernet 加密并持久化到磁盘"""
