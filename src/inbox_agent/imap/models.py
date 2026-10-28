@@ -109,5 +109,4 @@ class Email(BaseModel):
         """序列化为字典对象 (包含兼容字段 id 与格式化 date 字符串)"""
         data = self.model_dump(mode="json")
         data["id"] = self.uid
-        data["date"] = self.date_str
         return data

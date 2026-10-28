@@ -200,7 +200,8 @@ class EncryptedStore:
                     try:
                         # 规范化旧日期格式
                         item["event_date"] = parse_bjt_datetime(ev_date).start_of("day").isoformat()
-                    except Exception:
+                    except Exception as e:
+                        print(f"[Memory Warning] 迁移跳过无法解析有效日期的旧版日程条目 ({ev_date}): {e}", file=sys.stderr)
                         continue
 
                     # 补齐/规范化 added_at (必填时间戳，缺失补当前时间)
@@ -344,6 +345,8 @@ class InboxMemory:
                 existing.action_items = item.action_items or existing.action_items
                 existing.event_date = item_ev_date
                 existing.event_time = item.event_time or existing.event_time
+                existing.start_time = item.start_time or existing.start_time
+                existing.end_time = item.end_time or existing.end_time
                 existing.timezone = item.timezone or existing.timezone
                 existing.advance_days = item.advance_days
                 existing.priority = item.priority
@@ -367,10 +370,10 @@ class InboxMemory:
         else:
             now_dt = get_now_bjt()
 
-        today_date = now_dt.date()
+        today_date = now_dt.in_timezone("Asia/Shanghai").date()
         due_list = []
         for item in self.data.active_schedules:
-            ev_dt = parse_bjt_datetime(item.event_date).start_of("day")
+            ev_dt = parse_bjt_datetime(item.event_date).in_timezone("Asia/Shanghai").start_of("day")
             ev_date = ev_dt.date()
             delta_days = (ev_date - today_date).days
             advance = item.advance_days
@@ -403,10 +406,10 @@ class InboxMemory:
         else:
             now_dt = get_now_bjt()
 
-        today_date = now_dt.date()
+        today_date = now_dt.in_timezone("Asia/Shanghai").date()
         retained = []
         for item in self.data.active_schedules:
-            ev_date = parse_bjt_datetime(item.event_date).date()
+            ev_date = parse_bjt_datetime(item.event_date).in_timezone("Asia/Shanghai").date()
             if (today_date - ev_date).days <= 3:
                 retained.append(item)
         self.data.active_schedules = retained

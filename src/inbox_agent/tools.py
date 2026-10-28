@@ -241,6 +241,12 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
         display_time = start_t
     elif args.event_time.strip():
         display_time = args.event_time.strip()
+        if "-" in display_time:
+            parts = display_time.split("-", 1)
+            start_t = parts[0].strip()
+            end_t = parts[1].strip()
+        else:
+            start_t = display_time
     else:
         display_time = ""
 
@@ -284,6 +290,8 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
         "title": title,
         "event_date": event_dt,
         "event_time": display_time,
+        "start_time": start_t,
+        "end_time": end_t,
         "timezone": args.timezone.strip() or "Asia/Shanghai",
         "advance_days": args.advance_days,
         "action_items": args.action_items,
