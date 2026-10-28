@@ -73,7 +73,7 @@
 daily-actions/
 ├── .github/workflows/       # 声明式 GitHub Actions 编排配置
 ├── docs/                    # GitHub Pages 静态门户与研报历史归档
-├── scripts/                 # 运维工具 (如 generate_inbox_key.py)
+├── scripts/                 # 运维工具 (如 generate_inbox_key.py, init_state_branches.{sh,ps1})
 ├── src/                     # 标准 Python 模块源码根目录 (各组件均含独立 README)
 │   ├── inbox_agent/         # 📬 收件箱智能分流、DDL提炼与 90 天历史沉淀归档
 │   ├── paper_agent/         # 🤖 前沿 AI 学术研究追踪与两阶段研判
@@ -117,7 +117,14 @@ uv run ruff format src/ scripts/
 ## 🔒 分支架构策略
 
 - **`master`**：主开发分支，维护核心源码、工作流定义与依赖锁文件。
-- **`state/{ci-name}`**：各任务专属的独立持久化状态分支（如 `state/inbox-agent`, `state/paper-agent`），彻底解耦并发冲突。
+- **`state/{ci-name}`**：各任务专属的独立持久化状态分支（如 `state/inbox-agent`, `state/paper-agent`），彻底解耦并发冲突。可使用运维脚本一键安全初始化新模块状态分支（自动检测远端已有分支、防误覆盖且隔离工作区）：
+  ```bash
+  # Bash (Linux / macOS)
+  ./scripts/init_state_branches.sh [inbox-agent ...]
+
+  # PowerShell (Windows)
+  .\scripts\init_state_branches.ps1 [-Modules inbox-agent, ...]
+  ```
 - **`gh-pages`**：静态网站托管分支，由 CI 自动增量构建发布全站门户与历史研报归档。
 
 ---
