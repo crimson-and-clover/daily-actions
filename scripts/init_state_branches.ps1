@@ -1,38 +1,77 @@
 <#
 .SYNOPSIS
-一键初始化并推送各智能体纯净的状态孤儿分支 (state/*)
+一键安全初始化各智能体状态孤儿分支 (state/*)
+.DESCRIPTION
+1. 先检查远端是否已存在该分支，若已存在则直接跳过，防止覆盖历史；
+2. 全程在系统临时目录中独立操作，绝不干扰当前工作区；
+3. 根目录仅放置白名单专属 .gitignore，只允许 track 该模块专属目录，不预置业务数据文件。
 #>
 param(
     [string[]]$Modules = @("market-fx", "paper-agent", "world-news", "reviewer-radar")
 )
 
 $ErrorActionPreference = "Stop"
-$currentBranch = git branch --show-current
 
-foreach ($mod in $Modules) {
-    $stateBranch = "state/$mod"
-    $tempBranch = "orphan-init-$mod-$PID"
-
-    Write-Host "==> 正在初始化孤儿分支: $stateBranch..."
-    git checkout --orphan $tempBranch 2>$null | Out-Null
-    git rm -rf . 2>$null | Out-Null
-
-    New-Item -ItemType Directory -Force -Path $mod | Out-Null
-    $initJson = @"
-{
-  "version": 1,
-  "initialized_at": "$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))"
+$repoUrl = git remote get-url origin 2>$null
+if (-not $repoUrl) {
+    Write-Error "未找到远程仓库 origin 地址"
+    exit 1
 }
+
+$tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("state-init-" + [System.Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Force -Path $tempBase | Out-Null
+
+try {
+    foreach ($mod in $Modules) {
+        $stateBranch = "state/$mod"
+
+        # 1. 检查远端是否已存在该状态分支
+        git ls-remote --exit-code --heads origin $stateBranch 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[跳过] 远端已存在 $stateBranch 分支，保留既有历史状态。"
+            continue
+        }
+
+        Write-Host "==> [初始化] 远端不存在 $stateBranch，正在安全创建..."
+
+        $workDir = Join-Path $tempBase $mod
+        New-Item -ItemType Directory -Force -Path $workDir | Out-Null
+        Push-Location $workDir
+
+        try {
+            git init -q
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git remote add origin $repoUrl
+            git checkout --orphan $stateBranch -q
+
+            # 2. 创建只允许 track 对应模块目录的专属白名单 .gitignore
+            $gitIgnoreContent = @"
+# 仅允许追踪 $mod 模块的状态目录及本配置
+/*
+!/$mod/
+!/$mod/**
+!.gitignore
 "@
-    Set-Content -Path "$mod/history.json" -Value $initJson -Encoding utf8
+            Set-Content -Path ".gitignore" -Value $gitIgnoreContent -Encoding utf8
+            New-Item -ItemType Directory -Force -Path $mod | Out-Null
+            New-Item -ItemType File -Force -Path "$mod/.gitkeep" | Out-Null
 
-    git add -f "$mod/history.json"
-    git commit -m "chore($mod): initialize clean orphan state branch" 2>$null | Out-Null
-    git push -f origin "${tempBranch}:${stateBranch}"
+            git add .gitignore "$mod/.gitkeep"
+            git commit -m "chore($mod): initialize isolated state branch with exclusive gitignore" -q
+            git push -u origin $stateBranch
 
-    git checkout $currentBranch 2>$null | Out-Null
-    git branch -D $tempBranch 2>$null | Out-Null
-    Write-Host "==> $stateBranch 初始化并推送成功。"
+            Write-Host "==> [成功] $stateBranch 已初始化并推送到远端。"
+        }
+        finally {
+            Pop-Location
+        }
+    }
+}
+finally {
+    if (Test-Path $tempBase) {
+        Remove-Item -Recurse -Force $tempBase 2>$null
+    }
 }
 
-Write-Host "==> 所有指定的状态分支已全部初始化完毕！"
+Write-Host "==> 所有指定状态分支检查与初始化已完成！"
