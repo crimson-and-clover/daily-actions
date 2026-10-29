@@ -107,7 +107,7 @@ def main():
     unprocessed_emails = [e for e in raw_emails if not memory.is_processed(e.message_id)]
     print(f"[过滤] 待分类新邮件: {len(unprocessed_emails)} 封 (已跳过历史处理邮件 {len(raw_emails) - len(unprocessed_emails)} 封)")
 
-    inbox_tracker = BatchTracker()
+    inbox_tracker = BatchTracker(user_email=GMAIL_USER)
     context = ToolContext(
         connection=conn,
         repo=repo,
@@ -149,6 +149,7 @@ def main():
                     add=["system_notification"],
                     remove=["inbox"],
                     tldr="系统自动化任务简报/CI通知（硬规则自动归档）",
+                    is_internal_ci=True,
                 )
                 archive_success = True
             except Exception as e:
@@ -191,7 +192,7 @@ def main():
     # -------------------------------------------------------------------------
     # 阶段 4: 垃圾箱误杀复核托管 (从 [Gmail]/Spam 中解救被误杀的正常邮件)
     # -------------------------------------------------------------------------
-    spam_tracker = BatchTracker()
+    spam_tracker = BatchTracker(user_email=GMAIL_USER)
     raw_spam_emails: list[Email] = []
     try:
         raw_spam_emails = repo.fetch_emails(
@@ -254,12 +255,24 @@ def main():
     # 阶段 6: 邮件简报渲染与通知分发
     # -------------------------------------------------------------------------
     all_schedules = inbox_tracker.schedules + spam_tracker.schedules
+
+    # 汇总重要来信视图：将收件箱保留的重要邮件与从垃圾箱误判解救的邮件统一呈现
+    rescued_importants = []
+    for item in spam_tracker.rescued_items:
+        rescued_item = dict(item)
+        tldr = rescued_item.get("tldr") or ""
+        if "[垃圾箱解救]" not in tldr:
+            rescued_item["tldr"] = f"[垃圾箱解救] {tldr}".strip()
+        rescued_importants.append(rescued_item)
+
+    all_importants = inbox_tracker.importants + rescued_importants
+
     email_html = render_email_report(
         date_str=now_dt.strftime("%Y-%m-%d %H:%M"),
         run_slot=run_slot,
         schedules=all_schedules,
         today_due_schedules=today_due_schedules,
-        importants=inbox_tracker.importants,
+        importants=all_importants,
         systems=inbox_tracker.systems,
         marketings=inbox_tracker.marketings,
         spams=inbox_tracker.spams,
@@ -274,7 +287,7 @@ def main():
     subject = (
         f"[Inbox Agent] {date_str} 收件箱简报[{run_slot}]: "
         f"{len(all_schedules)}项新增待办{due_today_tag} | "
-        f"{len(inbox_tracker.importants)}封重要 | "
+        f"{len(all_importants)}封重要 | "
         f"归档{inbox_tracker.systems_moved_count}封通知 | "
         f"隔离{inbox_tracker.marketings_moved_count}封营销 | "
         f"移入{inbox_tracker.spams_moved_count}封垃圾"
