@@ -5,7 +5,6 @@ Inbox Agent 工具系统 (Tools Definition & Modular Dispatcher)
 
 import hashlib
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 import openai
@@ -21,6 +20,7 @@ from inbox_agent.imap import (
     MessageRepo,
 )
 from inbox_agent.memory import InboxMemory
+from utils.timezone import get_now_bjt, parse_bjt_datetime
 
 # ==============================================================================
 # 1. Pydantic 工具入参模型 (用于自动导出标准 OpenAI Tool Docs)
@@ -76,7 +76,9 @@ class CreateCalendarEventArgs(BaseModel):
     title: str = Field(description="日程标题 (如：季度战略复盘会、信用卡还款日、酒店入住)")
     event_date: str = Field(description="具体日期 (格式严格为 YYYY-MM-DD)", pattern=r"^\d{4}-\d{2}-\d{2}$")
     message_id: str = Field(description="关联邮件的全局唯一 Message-ID (RFC 822)")
-    event_time: str = Field(default="", description="具体时间点或区间 (如: '14:00' 或 '09:30-11:30')")
+    start_time: str = Field(default="", description="日程开始具体时间 (如 '09:30' 或 '14:00'，格式为 HH:mm；全天日程留空)")
+    end_time: str = Field(default="", description="日程结束具体时间 (可选，如 '11:30' 或 '16:00'，格式为 HH:mm)")
+    event_time: str = Field(default="", description="兼容历史入参，具体时间点或区间 (如: '14:00' 或 '09:30-11:30')")
     timezone: str = Field(default="Asia/Shanghai", description="日程时区，默认 'Asia/Shanghai'")
     advance_days: int = Field(default=3, description="提前几天开始在简报中预警提醒 (默认 3 天)")
     action_items: list[str] = Field(default_factory=list, description="提取的具体行动项列表")
@@ -213,14 +215,40 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
             "message": "message_id 不能为空，日程必须绑定具体邮件的全局 Message-ID",
         }
 
-    # 严格真实日历日期校验 (拦截 2026-02-30, 2026-13-01 等非法日期)
+    # 严格真实日历日期校验 (仅基于 event_date 校验年月日有效性，规避 event_time 区间干扰)
     try:
-        datetime.strptime(event_date, "%Y-%m-%d")
-    except ValueError:
+        event_dt = parse_bjt_datetime(event_date).start_of("day")
+    except Exception:
         return {
             "status": "error",
             "message": f"event_date '{event_date}' 不是合法的日历日期 (格式须为 YYYY-MM-DD 且日期真实存在)",
         }
+
+    # 强类型基准日校验：若事件日期早于今日（北京时间），防御性拦截加入日程池
+    now_bjt = get_now_bjt().start_of("day")
+    if event_dt.date() < now_bjt.date():
+        return {
+            "status": "ignored",
+            "message": f"日程日期 {event_dt.format('YYYY-MM-DD')} 早于今日基准日 {now_bjt.format('YYYY-MM-DD')}，已过期失效，无需加入日程池",
+        }
+
+    # 结构化提取展示时间：优先采用 start_time 与 end_time，兼容传统 event_time
+    start_t = args.start_time.strip()
+    end_t = args.end_time.strip()
+    if start_t and end_t:
+        display_time = f"{start_t} - {end_t}"
+    elif start_t:
+        display_time = start_t
+    elif args.event_time.strip():
+        display_time = args.event_time.strip()
+        if "-" in display_time:
+            parts = display_time.split("-", 1)
+            start_t = parts[0].strip()
+            end_t = parts[1].strip()
+        else:
+            start_t = display_time
+    else:
+        display_time = ""
 
     email_info: dict[str, Any] = {}
 
@@ -251,7 +279,7 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
         }
 
     # 日程全局唯一 ID 仅跟随 Message-ID + 标题 + 日期派生
-    seed = f"{m_id}|{title}|{event_date}"
+    seed = f"{m_id}|{title}|{event_dt.format('YYYY-MM-DD')}"
     derived_schedule_id = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
 
     schedule_payload = {
@@ -260,8 +288,10 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
         "subject": email_info.get("subject", title),
         "from_addr": email_info.get("from_addr", ""),
         "title": title,
-        "event_date": event_date,
-        "event_time": args.event_time.strip(),
+        "event_date": event_dt,
+        "event_time": display_time,
+        "start_time": start_t,
+        "end_time": end_t,
         "timezone": args.timezone.strip() or "Asia/Shanghai",
         "advance_days": args.advance_days,
         "action_items": args.action_items,
@@ -273,7 +303,12 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
     item = ctx.memory.add_schedule(schedule_payload)
     # 即时落盘保存状态，防止进程中断导致日程丢失
     ctx.memory.save()
-    item_dict = item.model_dump() if item is not None else schedule_payload
+    # 强制 mode="json" 导出，确保 DateTime 对象序列化为字符串，防止 engine.py json.dumps 崩溃
+    item_dict = (
+        {**item.model_dump(mode="json"), "event_date": item.event_date_str}
+        if item is not None
+        else {**schedule_payload, "event_date": event_dt.format("YYYY-MM-DD")}
+    )
 
     return {
         "status": "success",

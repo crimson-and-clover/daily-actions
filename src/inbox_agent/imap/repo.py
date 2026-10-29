@@ -12,7 +12,7 @@ from imapclient.imap_utf7 import decode as utf7_decode
 
 from inbox_agent.imap.connection import ImapConnection
 from inbox_agent.imap.labels import LABEL_SPECS, labels_to_codes
-from inbox_agent.imap.models import Email
+from inbox_agent.imap.models import Email, EmailContentResult
 from inbox_agent.imap.parser import parse_email_message
 
 
@@ -57,8 +57,8 @@ class MessageRepo:
             if message_id and is_processed_func and is_processed_func(message_id):
                 continue
 
-            # 2. 抓取完整邮件报文与 Gmail 原生标签，失败直接 Fail-Fast
-            full_fetch = client.fetch([uid], [b"RFC822", b"X-GM-LABELS"])
+            # 2. 抓取完整邮件报文、原生 INTERNALDATE 与 Gmail 原生标签，失败直接 Fail-Fast
+            full_fetch = client.fetch([uid], [b"RFC822", b"INTERNALDATE", b"X-GM-LABELS"])
             if not full_fetch or uid not in full_fetch:
                 raise RuntimeError(f"未能抓取 UID {uid} 的 RFC822 完整报文")
 
@@ -66,7 +66,8 @@ class MessageRepo:
             if not raw_email_bytes:
                 raise RuntimeError(f"UID {uid} 的 RFC822 报文内容为空")
 
-            parsed = parse_email_message(raw_email_bytes)
+            internal_dt = full_fetch[uid].get(b"INTERNALDATE")
+            parsed = parse_email_message(raw_email_bytes, internal_date=internal_dt)
 
             raw_labels = full_fetch[uid].get(b"X-GM-LABELS", ())
             labels: list[str] = [
@@ -89,6 +90,8 @@ class MessageRepo:
                     from_addr=parsed["from_addr"],
                     to_addr=parsed["to_addr"],
                     date=parsed["date"],
+                    raw_date=parsed.get("raw_date", ""),
+                    date_parsed=parsed.get("date_parsed", True),
                     snippet=parsed["body"][:1000],
                     body=parsed["body"],
                     raw_html=parsed["raw_html"],
@@ -112,7 +115,7 @@ class MessageRepo:
         self.connection.select_folder(folder)
 
         client = self.connection.client
-        fetch_data = client.fetch([email_uid], [b"RFC822"])
+        fetch_data = client.fetch([email_uid], [b"RFC822", b"INTERNALDATE"])
         if not fetch_data or email_uid not in fetch_data:
             raise KeyError(f"在目录 {folder} 中未找到 UID 为 {email_uid} 的邮件")
 
@@ -120,7 +123,8 @@ class MessageRepo:
         if not raw_bytes:
             raise ValueError(f"UID 为 {email_uid} 的邮件内容为空")
 
-        parsed = parse_email_message(raw_bytes)
+        internal_dt = fetch_data[email_uid].get(b"INTERNALDATE")
+        parsed = parse_email_message(raw_bytes, internal_date=internal_dt)
 
         body_text = parsed["body"]
         truncated = False
@@ -131,21 +135,22 @@ class MessageRepo:
             )
             truncated = True
 
-        return {
-            "status": "success",
-            "uid": email_uid,
-            "code": code,
-            "folder": folder,
-            "subject": parsed["subject"],
-            "from_addr": parsed["from_addr"],
-            "to_addr": parsed["to_addr"],
-            "date": parsed["date"],
-            "message_id": parsed["message_id"],
-            "body": body_text,
-            "attachments": parsed["attachments"],
-            "unsubscribe_link": parsed["unsubscribe_link"],
-            "truncated": truncated,
-        }
+        content_model = EmailContentResult(
+            status="success",
+            uid=email_uid,
+            code=code,
+            folder=folder,
+            subject=parsed["subject"],
+            from_addr=parsed["from_addr"],
+            to_addr=parsed["to_addr"],
+            date=parsed["date"],
+            message_id=parsed["message_id"],
+            body=body_text,
+            attachments=parsed["attachments"],
+            unsubscribe_link=parsed["unsubscribe_link"],
+            truncated=truncated,
+        )
+        return content_model.model_dump(mode="json")
 
     def get_email_by_message_id(
         self,
@@ -220,13 +225,14 @@ class MessageRepo:
         selected_uids = list(reversed(uids))[:limit]
         emails: list[Email] = []
         for uid in selected_uids:
-            fetch_data = client.fetch([uid], [b"RFC822", b"X-GM-LABELS"])
+            fetch_data = client.fetch([uid], [b"RFC822", b"INTERNALDATE", b"X-GM-LABELS"])
             if not fetch_data or uid not in fetch_data:
                 continue
             raw_email_bytes = fetch_data[uid].get(b"RFC822", b"")
             if not raw_email_bytes:
                 continue
-            parsed = parse_email_message(raw_email_bytes)
+            internal_dt = fetch_data[uid].get(b"INTERNALDATE")
+            parsed = parse_email_message(raw_email_bytes, internal_date=internal_dt)
 
             raw_labels = fetch_data[uid].get(b"X-GM-LABELS", ())
             labels: list[str] = [
@@ -249,6 +255,8 @@ class MessageRepo:
                     from_addr=parsed["from_addr"],
                     to_addr=parsed["to_addr"],
                     date=parsed["date"],
+                    raw_date=parsed.get("raw_date", ""),
+                    date_parsed=parsed.get("date_parsed", True),
                     snippet=parsed["body"][:1000],
                     body=parsed["body"],
                     raw_html=parsed["raw_html"],

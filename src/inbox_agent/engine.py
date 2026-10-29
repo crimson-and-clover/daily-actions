@@ -3,13 +3,13 @@ Inbox Agent 智能决策与 ReAct 多轮工具调用引擎 (Engine)
 驱动 Agent 在每个 Batch 开启独立上下文，依据用户偏好自主规划并调用工具处理邮件
 """
 
-import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from openai import OpenAI
+from pydantic import BaseModel, TypeAdapter
 
 from inbox_agent.config import (
     DEEPSEEK_API_KEY,
@@ -25,6 +25,7 @@ from utils.prompt_loader import render_prompt_template
 from utils.timezone import get_bjt_date_str, get_bjt_weekday_str
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "templates" / "prompts"
+_TOOL_JSON_ADAPTER = TypeAdapter(Any)
 
 
 def build_system_prompt(user_email: str, current_code: str = "inbox") -> str:
@@ -44,8 +45,10 @@ def build_batch_user_prompt(
     batch_num: int,
     total_batches: int,
     current_code: str = "inbox",
+    current_date: str | None = None,
 ) -> str:
     """从 Jinja2 模板渲染单批次邮件快照 Prompt，附带 Message-ID 以便日程提取"""
+    current_date_str = current_date or get_bjt_date_str()
     clean_emails = []
     for e in batch_emails:
         text_source = e.body or e.snippet or ""
@@ -53,7 +56,7 @@ def build_batch_user_prompt(
         clean_emails.append({
             "uid": str(e.uid),
             "sender": e.from_addr,
-            "date": e.date,
+            "date": e.date_str if hasattr(e, "date_str") else str(e.date),
             "subject": e.subject,
             "message_id": e.message_id,
             "snippet": clean_snippet,
@@ -66,6 +69,7 @@ def build_batch_user_prompt(
         batch_num=batch_num,
         total_batches=total_batches,
         current_code=current_code,
+        current_date=current_date_str,
     )
 
 
@@ -260,10 +264,15 @@ class AgentEngine:
                         if tool_result.get("draft"):
                             tracker.record_draft(tool_result["draft"])
 
+                if isinstance(tool_result, BaseModel):
+                    tool_content = tool_result.model_dump_json()
+                else:
+                    tool_content = _TOOL_JSON_ADAPTER.dump_json(tool_result).decode("utf-8")
+
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
-                    "content": json.dumps(tool_result, ensure_ascii=False),
+                    "content": tool_content,
                 })
 
         # 批次提交持久化状态：
