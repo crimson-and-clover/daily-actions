@@ -198,8 +198,15 @@ class BatchTracker:
 
     @property
     def systems_moved_count(self) -> int:
-        """从收件箱成功移入系统通知目录的邮件总数（add 包含 system_notification 且 remove 包含 inbox）"""
-        return sum(1 for d in self.triage_decisions.values() if "system_notification" in d.add and "inbox" in d.remove)
+        """从收件箱成功移入系统通知目录的邮件总数（排除内部自发 CI 简报，与 systems 列表展示口径严格一致）"""
+        count = 0
+        for uid, d in self.triage_decisions.items():
+            if "system_notification" in d.add and "inbox" in d.remove:
+                e = self.email_map.get(uid)
+                if e and is_internal_ci(e.subject):
+                    continue
+                count += 1
+        return count
 
     @property
     def spams_moved_count(self) -> int:

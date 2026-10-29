@@ -40,7 +40,7 @@ def classify_email(email: Email, api_key: str, my_email: str = "") -> dict:
     snippet = email.snippet or ""
 
     # 1. 规则预判：判定是否为系统自身的自动化任务/CI报告
-    if is_internal_ci(email.subject):
+    if is_internal_ci(email.subject, sender=email.from_addr, my_email=my_email):
         return {
             "category": "newsletter_system",
             "priority": "P2",

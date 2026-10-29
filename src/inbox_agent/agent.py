@@ -103,20 +103,6 @@ def main():
         conn.close()
         sys.exit(1)
 
-    try:
-        # 同时拉取垃圾箱近期的拦截邮件，用于后续误杀排查与解救
-        raw_spam_emails = repo.fetch_emails(
-            code="spam",
-            criteria=criteria,
-            limit=30,
-            is_processed_func=memory.is_processed,
-        )
-        print(f"[IMAP] 获取到垃圾箱近期待复核邮件: {len(raw_spam_emails)} 封")
-    except Exception as e:
-        print(f"[IMAP Fatal Error] 获取垃圾箱邮件异常: {e}", file=sys.stderr)
-        conn.close()
-        sys.exit(1)
-
     # 应用层二次防重过滤：确保绝对不重复研判已沉淀至记忆库的邮件
     unprocessed_emails = [e for e in raw_emails if not memory.is_processed(e.message_id)]
     print(f"[过滤] 待分类新邮件: {len(unprocessed_emails)} 封 (已跳过历史处理邮件 {len(raw_emails) - len(unprocessed_emails)} 封)")
@@ -141,7 +127,7 @@ def main():
     agent_emails: list[Email] = []
 
     for e in unprocessed_emails:
-        if is_internal_ci(e.subject):
+        if is_internal_ci(e.subject, sender=e.from_addr, my_email=GMAIL_USER):
             rule_filtered_emails.append(e)
         else:
             agent_emails.append(e)
@@ -153,11 +139,10 @@ def main():
         archive_success = False
         if rule_uids:
             try:
-                label_service.apply_labels(
+                label_service.set_labels(
                     uids=rule_uids,
                     add=["system_notification"],
                     remove=["inbox"],
-                    code="inbox",
                 )
                 tracker.record_labels(
                     uids=rule_uids,
@@ -168,14 +153,12 @@ def main():
                 archive_success = True
             except Exception as e:
                 print(f"[规则预过滤 Warning] 归档内部 CI 邮件失败: {e}，跳过标记已处理以便下次重试", file=sys.stderr)
-        else:
-            archive_success = True
 
         if archive_success:
-            processed_ids = [e.message_id for e in rule_filtered_emails if e.message_id]
-            if processed_ids:
-                memory.mark_processed(processed_ids)
-                memory.save()
+            for e in rule_filtered_emails:
+                if e.message_id:
+                    memory.mark_processed(e.message_id)
+            memory.save()
 
     # -------------------------------------------------------------------------
     # 阶段 3: 批处理 ReAct 智能分流与决策执行
@@ -208,6 +191,18 @@ def main():
     # -------------------------------------------------------------------------
     # 阶段 4: 垃圾箱误杀复核托管 (从 [Gmail]/Spam 中解救被误杀的正常邮件)
     # -------------------------------------------------------------------------
+    raw_spam_emails: list[Email] = []
+    try:
+        raw_spam_emails = repo.fetch_emails(
+            code="spam",
+            criteria=criteria,
+            limit=30,
+            is_processed_func=memory.is_processed,
+        )
+        print(f"\n[IMAP] 获取到垃圾箱近期待复核邮件: {len(raw_spam_emails)} 封")
+    except Exception as e:
+        print(f"\n[IMAP Warning] 获取垃圾箱待复核邮件异常: {e}，跳过垃圾箱复核", file=sys.stderr)
+
     unprocessed_spams = [e for e in raw_spam_emails if not memory.is_processed(e.message_id)]
     if unprocessed_spams:
         total_unprocessed_spams = len(unprocessed_spams)
