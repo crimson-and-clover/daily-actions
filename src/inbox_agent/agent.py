@@ -107,7 +107,7 @@ def main():
     unprocessed_emails = [e for e in raw_emails if not memory.is_processed(e.message_id)]
     print(f"[过滤] 待分类新邮件: {len(unprocessed_emails)} 封 (已跳过历史处理邮件 {len(raw_emails) - len(unprocessed_emails)} 封)")
 
-    tracker = BatchTracker()
+    inbox_tracker = BatchTracker()
     context = ToolContext(
         connection=conn,
         repo=repo,
@@ -135,7 +135,7 @@ def main():
     if rule_filtered_emails:
         rule_uids = [e.uid for e in rule_filtered_emails if e.uid]
         print(f"[规则预过滤] 命中 {len(rule_filtered_emails)} 封内部自动化/CI 邮件，直接规则归档至系统通知目录并标记已处理...")
-        tracker.register_batch_emails(rule_filtered_emails)
+        inbox_tracker.register_batch_emails(rule_filtered_emails)
         archive_success = False
         if rule_uids:
             try:
@@ -144,7 +144,7 @@ def main():
                     add=["system_notification"],
                     remove=["inbox"],
                 )
-                tracker.record_labels(
+                inbox_tracker.record_labels(
                     uids=rule_uids,
                     add=["system_notification"],
                     remove=["inbox"],
@@ -172,25 +172,26 @@ def main():
         batch_num = (batch_idx // BATCH_SIZE) + 1
         print(f"\n--- [批次 {batch_num}/{total_batches}] 正在由 Agent 处理 {len(batch)} 封收件箱新邮件 ---")
 
-        # 启动当前批次的 ReAct 循环，模型自主调用工具，结果实时反馈给 tracker
+        # 启动当前批次的 ReAct 循环，模型自主调用工具，结果实时反馈给 inbox_tracker
         summary = engine.run_batch_triage(
             batch_emails=batch,
             batch_num=batch_num,
             total_batches=total_batches,
             context=context,
             user_email=GMAIL_USER,
-            tracker=tracker,
+            tracker=inbox_tracker,
         )
         print(f"  [批次 {batch_num}/{total_batches} 总结]: {summary}")
 
         # 【核心容灾设计】每完成一个批次立即落盘保存 Fernet AES 加密记忆库！
         # 即使后续网络偶发闪断或 GitHub Actions 运行超时，前面已完成的批次也绝对不会丢失
         memory.save()
-        print(f"  [批次进度已保存] 累计移动: 商业推广 {tracker.marketings_moved_count} | 系统通知 {tracker.systems_moved_count} | 垃圾箱 {tracker.spams_moved_count}")
+        print(f"  [批次进度已保存] 累计移动: 商业推广 {inbox_tracker.marketings_moved_count} | 系统通知 {inbox_tracker.systems_moved_count} | 垃圾箱 {inbox_tracker.spams_moved_count}")
 
     # -------------------------------------------------------------------------
     # 阶段 4: 垃圾箱误杀复核托管 (从 [Gmail]/Spam 中解救被误杀的正常邮件)
     # -------------------------------------------------------------------------
+    spam_tracker = BatchTracker()
     raw_spam_emails: list[Email] = []
     try:
         raw_spam_emails = repo.fetch_emails(
@@ -222,7 +223,7 @@ def main():
                 total_batches=total_spam_batches,
                 context=context,
                 user_email=GMAIL_USER,
-                tracker=tracker,
+                tracker=spam_tracker,
             )
             print(f"  [垃圾箱复核批次 {s_batch_num}/{total_spam_batches} 总结]: {s_summary}")
 
@@ -230,7 +231,7 @@ def main():
             for item in s_batch:
                 m_id = item.message_id
                 uid = item.uid
-                is_rescued = any(r.get("uid") == uid for r in tracker.rescued_items)
+                is_rescued = any(r.get("uid") == uid for r in spam_tracker.rescued_items)
                 if not is_rescued and m_id and not memory.is_processed(m_id):
                     memory.mark_processed(m_id, is_spam=True)
             memory.save()
@@ -252,30 +253,31 @@ def main():
     # -------------------------------------------------------------------------
     # 阶段 6: 邮件简报渲染与通知分发
     # -------------------------------------------------------------------------
+    all_schedules = inbox_tracker.schedules + spam_tracker.schedules
     email_html = render_email_report(
         date_str=now_dt.strftime("%Y-%m-%d %H:%M"),
         run_slot=run_slot,
-        schedules=tracker.schedules,
+        schedules=all_schedules,
         today_due_schedules=today_due_schedules,
-        importants=tracker.importants,
-        systems=tracker.systems,
-        marketings=tracker.marketings,
-        spams=tracker.spams,
-        marketings_moved_count=tracker.marketings_moved_count,
-        systems_moved_count=tracker.systems_moved_count,
-        spams_moved_count=tracker.spams_moved_count,
-        rescued_items=tracker.rescued_items,
+        importants=inbox_tracker.importants,
+        systems=inbox_tracker.systems,
+        marketings=inbox_tracker.marketings,
+        spams=inbox_tracker.spams,
+        marketings_moved_count=inbox_tracker.marketings_moved_count,
+        systems_moved_count=inbox_tracker.systems_moved_count,
+        spams_moved_count=inbox_tracker.spams_moved_count,
+        rescued_items=spam_tracker.rescued_items,
     )
 
     # 邮件标题：遵循无 Emoji、高信息密度与关键统计显式呈现规范
     due_today_tag = f" | 今日到期{len(today_due_schedules)}项" if today_due_schedules else ""
     subject = (
         f"[Inbox Agent] {date_str} 收件箱简报[{run_slot}]: "
-        f"{len(tracker.schedules)}项新增待办{due_today_tag} | "
-        f"{len(tracker.importants)}封重要 | "
-        f"归档{tracker.systems_moved_count}封通知 | "
-        f"隔离{tracker.marketings_moved_count}封营销 | "
-        f"移入{tracker.spams_moved_count}封垃圾"
+        f"{len(all_schedules)}项新增待办{due_today_tag} | "
+        f"{len(inbox_tracker.importants)}封重要 | "
+        f"归档{inbox_tracker.systems_moved_count}封通知 | "
+        f"隔离{inbox_tracker.marketings_moved_count}封营销 | "
+        f"移入{inbox_tracker.spams_moved_count}封垃圾"
     )
     preview_email_path = Path(__file__).resolve().parent / "preview_email.html"
 
