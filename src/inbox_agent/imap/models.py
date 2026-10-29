@@ -49,8 +49,8 @@ class EmailContentResult(BaseModel):
 
     @field_serializer("date", mode="plain")
     def _serialize_date(self, dt: datetime) -> str:
-        """统一序列化为带 ISO 时区偏移的标准字符串，避免裸 DateTime 进入 json 序列化链路"""
-        return parse_bjt_datetime(dt).format("YYYY-MM-DD HH:mmZ")
+        """统一序列化为符合 ISO-8601 标准的带时区字符串，避免裸 DateTime 进入 json 序列化链路"""
+        return parse_bjt_datetime(dt).isoformat()
 
 
 class Email(BaseModel):
@@ -101,9 +101,9 @@ class Email(BaseModel):
 
     @property
     def date_str(self) -> str:
-        """返回带 ISO 时区偏移量的格式化字符串，如 2026-10-27 15:30+08:00"""
+        """返回符合 ISO-8601 标准的带时区字符串，如 2026-10-27T15:30:00+08:00"""
         dt = parse_bjt_datetime(self.date)
-        return dt.format("YYYY-MM-DD HH:mmZ")
+        return dt.isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         """序列化为字典对象 (包含兼容字段 id 与格式化 date 字符串)"""
