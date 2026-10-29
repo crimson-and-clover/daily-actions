@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from inbox_agent.imap.models import Email
+from inbox_agent.rules import is_internal_ci
 
 
 @dataclass
@@ -159,11 +160,14 @@ class BatchTracker:
 
     @property
     def systems(self) -> list[dict[str, Any]]:
-        """被归档至「系统通知」专属目录的邮件列表（add 中包含 'system_notification'）"""
+        """被归档至「系统通知」专属目录的邮件列表（add 中包含 'system_notification'，已过滤内部 CI 报告）"""
         result = []
         for uid, dec in self.triage_decisions.items():
             if "system_notification" in dec.add:
                 e = self.email_map.get(uid)
+                # 过滤自建 CI 任务报告，不在日报展示层冗余呈现
+                if e and is_internal_ci(e.subject):
+                    continue
                 result.append(self._email_to_report_dict(e, uid=uid, tldr=dec.tldr))
         return result
 
@@ -190,26 +194,14 @@ class BatchTracker:
     @property
     def marketings_moved_count(self) -> int:
         """从收件箱成功移入商业推广目录的邮件总数（add 包含 promotions 且 remove 包含 inbox）"""
-        return sum(
-            1
-            for d in self.triage_decisions.values()
-            if "promotions" in d.add and "inbox" in d.remove
-        )
+        return sum(1 for d in self.triage_decisions.values() if "promotions" in d.add and "inbox" in d.remove)
 
     @property
     def systems_moved_count(self) -> int:
         """从收件箱成功移入系统通知目录的邮件总数（add 包含 system_notification 且 remove 包含 inbox）"""
-        return sum(
-            1
-            for d in self.triage_decisions.values()
-            if "system_notification" in d.add and "inbox" in d.remove
-        )
+        return sum(1 for d in self.triage_decisions.values() if "system_notification" in d.add and "inbox" in d.remove)
 
     @property
     def spams_moved_count(self) -> int:
         """从收件箱成功移入垃圾邮件目录的邮件总数（add 包含 spam 且 remove 包含 inbox）"""
-        return sum(
-            1
-            for d in self.triage_decisions.values()
-            if "spam" in d.add and "inbox" in d.remove
-        )
+        return sum(1 for d in self.triage_decisions.values() if "spam" in d.add and "inbox" in d.remove)

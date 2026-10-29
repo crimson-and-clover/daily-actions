@@ -35,8 +35,10 @@ from inbox_agent.imap import (
     LabelService,
     MessageRepo,
 )
+from inbox_agent.imap.models import Email
 from inbox_agent.memory import InboxMemory
 from inbox_agent.renderer import render_email_report
+from inbox_agent.rules import is_internal_ci
 from inbox_agent.tools import ToolContext
 from inbox_agent.tracker import BatchTracker
 from utils.mailer import send_email_html
@@ -117,14 +119,8 @@ def main():
 
     # 应用层二次防重过滤：确保绝对不重复研判已沉淀至记忆库的邮件
     unprocessed_emails = [e for e in raw_emails if not memory.is_processed(e.message_id)]
-    print(
-        f"[过滤] 待分类新邮件: {len(unprocessed_emails)} 封 "
-        f"(已跳过历史处理邮件 {len(raw_emails) - len(unprocessed_emails)} 封)"
-    )
+    print(f"[过滤] 待分类新邮件: {len(unprocessed_emails)} 封 (已跳过历史处理邮件 {len(raw_emails) - len(unprocessed_emails)} 封)")
 
-    # -------------------------------------------------------------------------
-    # 阶段 3: 批处理 ReAct 智能分流与决策执行
-    # -------------------------------------------------------------------------
     tracker = BatchTracker()
     context = ToolContext(
         connection=conn,
@@ -137,12 +133,59 @@ def main():
     )
     engine = AgentEngine(api_key=DEEPSEEK_API_KEY)
 
-    total_unprocessed = len(unprocessed_emails)
+    # -------------------------------------------------------------------------
+    # 阶段 2.5: 内部自动化与系统报告硬规则预过滤 (Rule-based Pre-filter)
+    # -------------------------------------------------------------------------
+    # 内部 CI 邮件（如 [Inbox Agent] 简报等）直接规则归档，严禁进入 Agent，杜绝 Token 消耗与日程套娃
+    rule_filtered_emails: list[Email] = []
+    agent_emails: list[Email] = []
+
+    for e in unprocessed_emails:
+        if is_internal_ci(e.subject):
+            rule_filtered_emails.append(e)
+        else:
+            agent_emails.append(e)
+
+    if rule_filtered_emails:
+        rule_uids = [e.uid for e in rule_filtered_emails if e.uid]
+        print(f"[规则预过滤] 命中 {len(rule_filtered_emails)} 封内部自动化/CI 邮件，直接规则归档至系统通知目录并标记已处理...")
+        tracker.register_batch_emails(rule_filtered_emails)
+        archive_success = False
+        if rule_uids:
+            try:
+                label_service.apply_labels(
+                    uids=rule_uids,
+                    add=["system_notification"],
+                    remove=["inbox"],
+                    code="inbox",
+                )
+                tracker.record_labels(
+                    uids=rule_uids,
+                    add=["system_notification"],
+                    remove=["inbox"],
+                    tldr="系统自动化任务简报/CI通知（硬规则自动归档）",
+                )
+                archive_success = True
+            except Exception as e:
+                print(f"[规则预过滤 Warning] 归档内部 CI 邮件失败: {e}，跳过标记已处理以便下次重试", file=sys.stderr)
+        else:
+            archive_success = True
+
+        if archive_success:
+            processed_ids = [e.message_id for e in rule_filtered_emails if e.message_id]
+            if processed_ids:
+                memory.mark_processed(processed_ids)
+                memory.save()
+
+    # -------------------------------------------------------------------------
+    # 阶段 3: 批处理 ReAct 智能分流与决策执行
+    # -------------------------------------------------------------------------
+    total_unprocessed = len(agent_emails)
     total_batches = (total_unprocessed + BATCH_SIZE - 1) // BATCH_SIZE if total_unprocessed > 0 else 0
 
     # 分批执行收件箱新邮件研判与分流 (每批 10 封，开启全新独立对话上下文，杜绝 Token 膨胀)
     for batch_idx in range(0, total_unprocessed, BATCH_SIZE):
-        batch = unprocessed_emails[batch_idx : batch_idx + BATCH_SIZE]
+        batch = agent_emails[batch_idx : batch_idx + BATCH_SIZE]
         batch_num = (batch_idx // BATCH_SIZE) + 1
         print(f"\n--- [批次 {batch_num}/{total_batches}] 正在由 Agent 处理 {len(batch)} 封收件箱新邮件 ---")
 
@@ -160,10 +203,7 @@ def main():
         # 【核心容灾设计】每完成一个批次立即落盘保存 Fernet AES 加密记忆库！
         # 即使后续网络偶发闪断或 GitHub Actions 运行超时，前面已完成的批次也绝对不会丢失
         memory.save()
-        print(
-            f"  [批次进度已保存] 累计移动: 商业推广 {tracker.marketings_moved_count} | "
-            f"系统通知 {tracker.systems_moved_count} | 垃圾箱 {tracker.spams_moved_count}"
-        )
+        print(f"  [批次进度已保存] 累计移动: 商业推广 {tracker.marketings_moved_count} | 系统通知 {tracker.systems_moved_count} | 垃圾箱 {tracker.spams_moved_count}")
 
     # -------------------------------------------------------------------------
     # 阶段 4: 垃圾箱误杀复核托管 (从 [Gmail]/Spam 中解救被误杀的正常邮件)

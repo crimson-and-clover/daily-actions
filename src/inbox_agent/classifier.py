@@ -11,6 +11,7 @@ from openai import OpenAI
 
 from inbox_agent.config import DEEPSEEK_MODEL, DEEPSEEK_TIMEOUT
 from inbox_agent.imap.models import Email
+from inbox_agent.rules import is_internal_ci
 from utils.json_parser import parse_json_safely
 from utils.prompt_loader import render_prompt_template
 from utils.timezone import get_bjt_date_str, get_bjt_weekday_str
@@ -38,26 +39,8 @@ def classify_email(email: Email, api_key: str, my_email: str = "") -> dict:
     date_str = email.date or ""
     snippet = email.snippet or ""
 
-    # 1. 硬编码规则：来自自己(me)或项目内部各CI任务通知邮件，直接放入系统通知分类
-    my_email_lower = (my_email or "").strip().lower()
-    from_addr_lower = from_addr.lower()
-    subject_lower = subject.lower()
-
-    # 提取真实发件人邮箱地址与域名，杜绝显示名伪造 (如 "security@github.com" <evil@attacker.example>)
-    sender_real_addr = parseaddr(from_addr)[1].lower()
-    sender_domain = sender_real_addr.rsplit("@", 1)[-1] if "@" in sender_real_addr else ""
-
-    # 判定是否为本人或系统自发通知
-    is_from_me = False
-    if my_email_lower and my_email_lower == sender_real_addr:
-        is_from_me = True
-    elif "daily actions" in from_addr_lower or sender_domain == "github.com" or sender_domain.endswith(".github.com"):
-        is_from_me = True
-
-    # 判定是否属于内部已知任务前缀
-    is_internal_ci = any(ci_tag in subject_lower for ci_tag in ["[paper agent]", "[world news]", "[market fx]", "[inbox agent]", "daily actions"])
-
-    if is_from_me or is_internal_ci:
+    # 1. 规则预判：判定是否为系统自身的自动化任务/CI报告
+    if is_internal_ci(email.subject):
         return {
             "category": "newsletter_system",
             "priority": "P2",
@@ -65,8 +48,27 @@ def classify_email(email: Email, api_key: str, my_email: str = "") -> dict:
             "action_items": [],
             "event_time": "",
             "event_date": "",
-            "reason": "系统内建CI报告白名单",
-            "is_internal_ci": is_internal_ci or ("daily actions" in from_addr_lower),
+            "reason": "系统内建CI报告规则白名单",
+            "is_internal_ci": True,
+        }
+
+    # 提取真实发件人邮箱地址，杜绝显示名伪造 (如 "security@github.com" <evil@attacker.example>)
+    sender_real_addr = parseaddr(from_addr)[1].lower()
+
+    # 判定是否为本人自发邮件
+    my_email_lower = (my_email or "").strip().lower()
+    is_from_me = bool(my_email_lower and my_email_lower == sender_real_addr)
+
+    if is_from_me:
+        return {
+            "category": "newsletter_system",
+            "priority": "P2",
+            "tldr": subject[:30],
+            "action_items": [],
+            "event_time": "",
+            "event_date": "",
+            "reason": "来自本人的自发/往来邮件",
+            "is_internal_ci": False,
         }
 
     client = OpenAI(
