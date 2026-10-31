@@ -7,7 +7,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from inbox_agent.config import GMAIL_USER
 from inbox_agent.imap.models import Email
+from inbox_agent.rules import is_internal_ci
 
 
 @dataclass
@@ -20,12 +22,14 @@ class EmailDecision:
         remove: 累积移除的标签集合（如 "inbox", "spam"）
         triaged: 是否已被模型显式处置（通过 apply_labels 确立去向）
         tldr: 模型的处置备忘、分类理由或内容提炼
+        is_internal_ci: 是否属于系统自动化任务或 CI 简报（硬规则过滤标记）
     """
 
     add: set[str] = field(default_factory=set)
     remove: set[str] = field(default_factory=set)
     triaged: bool = False
     tldr: str = ""
+    is_internal_ci: bool = False
 
 
 class BatchTracker:
@@ -37,7 +41,8 @@ class BatchTracker:
     - 在多批次独立上下文的 ReAct 执行中保持累积状态，记录所有邮件的标签变动、日程沉淀与垃圾箱解救情况。
     """
 
-    def __init__(self):
+    def __init__(self, user_email: str = ""):
+        self.user_email = user_email or GMAIL_USER
         # 邮件映射快速索引：按原生 UID 缓存 Email 实体，便于快速提取主题、发件人等元数据
         self.email_map: dict[int, Email] = {}
         # 决策映射：记录每个 UID 的最终标签增删与处置理由
@@ -67,6 +72,7 @@ class BatchTracker:
         remove: list[str],
         tldr: str = "",
         current_code: str = "inbox",
+        is_internal_ci: bool = False,
     ) -> None:
         """
         记录工具 `apply_labels` 成功执行后的标签变更与处置理由。
@@ -77,6 +83,7 @@ class BatchTracker:
             remove: 本次操作移除的业务标签代码列表
             tldr: 模型的处置说明或备忘
             current_code: 当前处理所在的目录代码（"inbox" 或 "spam"）
+            is_internal_ci: 是否属于内部 CI / 自动化任务简报（硬规则过滤）
         """
         for uid in uids:
             if uid not in self.triage_decisions:
@@ -85,6 +92,8 @@ class BatchTracker:
             dec.triaged = True
             dec.add.update(add)
             dec.remove.update(remove)
+            if is_internal_ci:
+                dec.is_internal_ci = True
             if tldr:
                 dec.tldr = tldr
 
@@ -157,12 +166,34 @@ class BatchTracker:
                 result.append(self._email_to_report_dict(e, uid=uid, tldr=dec.tldr))
         return result
 
+    def _is_ci_email(self, uid: int, dec: EmailDecision) -> bool:
+        """
+        判定某封邮件是否属于内部自动化 CI 任务简报（需排除在简报展示与通知统计之外）。
+
+        判定原则：
+        1. 优先读取硬规则预过滤阶段标记的 dec.is_internal_ci；
+        2. 若未显式标记，执行带发件人防伪造的安全校验，严防外部仿冒前缀导致邮件被恶意隐身。
+        """
+        if dec.is_internal_ci:
+            return True
+        e = self.email_map.get(uid)
+        if not e:
+            return False
+        return is_internal_ci(
+            subject=e.subject or "",
+            sender=e.from_addr or "",
+            my_email=self.user_email,
+        )
+
     @property
     def systems(self) -> list[dict[str, Any]]:
-        """被归档至「系统通知」专属目录的邮件列表（add 中包含 'system_notification'）"""
+        """被归档至「系统通知」专属目录的邮件列表（add 中包含 'system_notification'，已过滤内部 CI 报告）"""
         result = []
         for uid, dec in self.triage_decisions.items():
             if "system_notification" in dec.add:
+                # 过滤自建 CI 任务报告，不在日报展示层冗余呈现（严格对齐发件人校验，防止外部仿冒前缀隐身）
+                if self._is_ci_email(uid, dec):
+                    continue
                 e = self.email_map.get(uid)
                 result.append(self._email_to_report_dict(e, uid=uid, tldr=dec.tldr))
         return result
@@ -190,26 +221,20 @@ class BatchTracker:
     @property
     def marketings_moved_count(self) -> int:
         """从收件箱成功移入商业推广目录的邮件总数（add 包含 promotions 且 remove 包含 inbox）"""
-        return sum(
-            1
-            for d in self.triage_decisions.values()
-            if "promotions" in d.add and "inbox" in d.remove
-        )
+        return sum(1 for d in self.triage_decisions.values() if "promotions" in d.add and "inbox" in d.remove)
 
     @property
     def systems_moved_count(self) -> int:
-        """从收件箱成功移入系统通知目录的邮件总数（add 包含 system_notification 且 remove 包含 inbox）"""
-        return sum(
-            1
-            for d in self.triage_decisions.values()
-            if "system_notification" in d.add and "inbox" in d.remove
-        )
+        """从收件箱成功移入系统通知目录的邮件总数（排除内部自发 CI 简报，与 systems 列表展示口径严格一致）"""
+        count = 0
+        for uid, d in self.triage_decisions.items():
+            if "system_notification" in d.add and "inbox" in d.remove:
+                if self._is_ci_email(uid, d):
+                    continue
+                count += 1
+        return count
 
     @property
     def spams_moved_count(self) -> int:
         """从收件箱成功移入垃圾邮件目录的邮件总数（add 包含 spam 且 remove 包含 inbox）"""
-        return sum(
-            1
-            for d in self.triage_decisions.values()
-            if "spam" in d.add and "inbox" in d.remove
-        )
+        return sum(1 for d in self.triage_decisions.values() if "spam" in d.add and "inbox" in d.remove)
