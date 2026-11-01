@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全球宏观、市场与计算开源内参</title>
+    <style>
+        /* 移动端与桌面端自适应、彻底告别挤压折叠 */
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f1f3f5;
+            margin: 0;
+            padding: 12px 6px;
+            color: #1a202c;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #d2d6dc;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        /* 刊头：流式上下堆叠，绝不左右横向硬挤 */
+        .masthead {
+            padding: 20px 18px 14px 18px;
+            border-bottom: 2px solid #0f172a;
+            background: #ffffff;
+        }
+        .masthead-meta-top {
+            font-size: 11px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .masthead h1 {
+            margin: 4px 0 6px 0;
+            font-size: 21px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            line-height: 1.3;
+        }
+        .masthead-date {
+            font-size: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .masthead-sub {
+            margin: 0;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        /* 态势关键信号横条：采用竖向流式清单，杜绝横向窄列挤压 */
+        .signals-box {
+            padding: 12px 18px;
+            background-color: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .signals-title {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .signals-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .signals-list li {
+            position: relative;
+            padding-left: 14px;
+            font-size: 12.5px;
+            color: #334155;
+            line-height: 1.5;
+            margin-bottom: 6px;
+        }
+        .signals-list li:last-child {
+            margin-bottom: 0;
+        }
+        .signals-list li::before {
+            content: "▪";
+            position: absolute;
+            left: 0;
+            color: #2563eb;
+            font-size: 13px;
+        }
+
+        .content {
+            padding: 18px 16px;
+        }
+
+        /* 宏观态势综述 */
+        .summary-block {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #0f172a;
+            padding: 14px 16px;
+            margin-bottom: 24px;
+            border-radius: 0 4px 4px 0;
+        }
+        .summary-label {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+        .summary-body {
+            font-size: 13.5px;
+            color: #1e293b;
+            line-height: 1.65;
+            text-align: justify;
+        }
+
+        /* 板块分割栏 */
+        .section {
+            margin-bottom: 26px;
+        }
+        .section-header {
+            border-bottom: 1.5px solid #0f172a;
+            padding-bottom: 6px;
+            margin-bottom: 14px;
+        }
+        .section-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            display: inline-block;
+        }
+        .section-code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+            display: inline-block;
+            margin-left: 6px;
+        }
+
+        /* 条目卡片 */
+        .item-card {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            padding: 14px 14px 12px 14px;
+            margin-bottom: 16px;
+            border-radius: 4px;
+        }
+
+        /* 卡片头部：分层解耦，不再横向打架 */
+        .item-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .badge-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .item-tag {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #1d4ed8;
+            background-color: #eff6ff;
+            border: 1px solid #dbeafe;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .source-tag {
+            font-size: 10.5px;
+            color: #475569;
+            background-color: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        .score-pill-overall {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 2px;
+            background-color: #0f172a;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        /* 细分多维指标条：单起一行，清晰明了 */
+        .sub-metrics-row {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 10.5px;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed #f1f5f9;
+        }
+        .sub-metrics-row span {
+            color: #1e293b;
+        }
+
+        .item-title {
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.45;
+            color: #0f172a;
+            margin: 0 0 10px 0;
+        }
+        .item-title a {
+            color: #0f172a;
+            text-decoration: none;
+        }
+        .item-title a:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+
+        /* 段落式正文：流式撑满全宽，彻底消除 86px 逼仄分栏 */
+        .data-content {
+            font-size: 13px;
+            color: #1f2937;
+            line-height: 1.6;
+        }
+        .data-para {
+            margin-bottom: 8px;
+            text-align: justify;
+        }
+        .data-para:last-child {
+            margin-bottom: 0;
+        }
+        .para-label {
+            font-weight: 700;
+            color: #475569;
+            font-size: 12px;
+            display: inline;
+            margin-right: 4px;
+        }
+        .para-rationale {
+            font-size: 12px;
+            color: #64748b;
+            font-style: italic;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* 市场资产传导专属研判框：自适应流式排版 */
+        .market-box {
+            margin-top: 10px;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 3px solid #2563eb;
+            padding: 9px 12px;
+            font-size: 12.5px;
+            border-radius: 0 3px 3px 0;
+        }
+        .market-header {
+            font-weight: 700;
+            color: #1e40af;
+            font-size: 11px;
+            margin-bottom: 4px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .assets-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            padding: 1px 5px;
+            border-radius: 2px;
+            font-size: 11px;
+            margin-left: 4px;
+            font-weight: 600;
+        }
+        .market-logic {
+            color: #0f172a;
+            line-height: 1.55;
+            text-align: justify;
+            margin-top: 4px;
+        }
+
+        /* 元信息脚标栏 */
+        .item-footer {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px dashed #e2e8f0;
+            font-size: 11px;
+            color: #94a3b8;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .item-footer a {
+            color: #64748b;
+            text-decoration: none;
+        }
+        .item-footer a:hover {
+            text-decoration: underline;
+        }
+        .stat-badge {
+            color: #334155;
+            font-weight: 600;
+        }
+
+        /* 脚注 */
+        .footer {
+            padding: 16px 18px;
+            font-size: 11px;
+            color: #64748b;
+            background: #fafafa;
+            border-top: 1px solid #e5e7eb;
+            line-height: 1.55;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="padding: 12px 18px 0 18px; font-size: 12px; color: #64748b; background: #ffffff;">
+            <a href="../index.html" style="color: #2563eb; text-decoration: none; font-weight: 500;">&larr; 返回资讯专区目录</a>
+            <span style="margin: 0 8px; color: #cbd5e1;">|</span>
+            <a href="../../index.html" style="color: #64748b; text-decoration: none;">知识门户总览</a>
+        </div>
+        <!-- 刊头 -->
+        <div class="masthead">
+            <div class="masthead-meta-top">GLOBAL INTELLIGENCE & TECHNOLOGY BRIEFING</div>
+            <h1>全球宏观、市场与计算开源内参</h1>
+            <div class="masthead-date">2026年11月01日 (北京时间)</div>
+            <p class="masthead-sub">
+                多源聚合 • 多维度量化评级 (Overall &ge; 7.0) • 资本市场与产业传导研判
+            </p>
+        </div>
+
+        <!-- 态势关键信号栏：纵向流式清单，彻底解决横向挤压 -->
+        <div class="signals-box">
+            <div class="signals-title">KEY SIGNALS / 核心态势信号</div>
+            <ul class="signals-list">
+                <li>AI交易从单边做多转向风险对冲，保险与期权需求激增，科技股高估值面临系统性重定价压力</li>
+                <li>俄罗斯影子舰队遭袭风险上升，能源运输安全溢价与制裁规避成本同步抬升，油价波动率结构性走高</li>
+                <li>英国企业涨价预期黏性强化，叠加工资增速放缓，英央行降息路径复杂化，英镑与金边债券收益率双向波动</li>
+                <li>TCP最高危漏洞与多模型编排突破并行，基础设施安全支出与AI推理效率优化成为技术资本新流向</li>
+            </ul>
+        </div>
+
+        <div class="content">
+
+            <!-- 宏观态势综述 -->
+            <div class="summary-block">
+                <div class="summary-label">EXECUTIVE SUMMARY / 宏观态势与市场综述</div>
+                <div class="summary-body">全球市场在地缘博弈与AI交易脆弱性间震荡：俄影子舰队遭袭风险推升能源溢价，科技股抛售与AI保险需求暴露系统性脆弱，英国通胀黏性压制降息空间，韩国芯片出口强化半导体链；技术侧TCP高危漏洞与模型编排突破并行，安全与推理效率成资本定价新变量。</div>
+            </div>
+
+            <!-- 第一板块：宏观地缘与金融资本市场 -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">宏观地缘与全球金融市场</span>
+                    <span class="section-code">[SEC-01 / MACRO & FINANCIAL]</span>
+                </div>
+
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">资本市场/AI系统性风险</span>
+                                <span class="source-tag">WSJ Markets</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.8 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>8.5</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>9.0</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>9.0</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/finance/stocks/ai-investors-are-racing-to-get-insurance-on-the-biggest-market-bet-in-history-a60e296f?mod=rss_markets_main" target="_blank">AI投资者竞相为史上最大市场押注购买保险 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：AI交易规模空前，系统性风险与保险需求激增</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>随着数万亿美元资金涌入人工智能交易，投资者、交易员乃至科技高管正积极寻求高杠杆对冲与保险工具，以防范AI板块剧烈回调风险；市场对期权、信用违约互换及结构化保险产品的需求显著上升，保险成本与交易拥挤度同步攀升。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>AI多头基金与散户投资者希望锁定收益并对冲尾部风险；保险与再保险公司面临承保容量与定价挑战，态度谨慎；科技公司管理层担忧对冲成本上升削弱回购与资本开支能力；监管机构关注AI交易集中度是否构成系统性风险。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>AI资本开支与估值高度集中，保险与对冲需求激增反映市场对单一叙事依赖的脆弱性；若保险成本持续上升，将抑制杠杆资金流入AI板块，并推动资本向低相关资产轮动，长期可能重塑科技股风险溢价与全球资本配置结构。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">[&#39;纳斯达克100指数&#39;, &#39;AI半导体ETF（SMH/SOXX）&#39;, &#39;美股期权波动率（VIX/个股隐含波动率）&#39;, &#39;投资级信用利差&#39;]</span>
+                            </div>
+                            <div class="market-logic">对冲与保险需求上升推高隐含波动率与期权偏斜，做市商增加对冲卖压，压制高估值AI龙头；保险成本计入机构持仓成本，降低杠杆资金边际流入，利空高贝塔科技股，同时推升波动率相关资产与防御性板块配置需求。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: AI Investors Are Racing to Get Insurance on the Bi...</span>
+                            <span>Sun, 01 Nov 2026 00:00:00 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">地缘安全/能源</span>
+                                <span class="source-tag">WSJ World</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.3 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>8.8</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>7.5</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.2</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/world/russias-shadow-fleet-turns-to-nets-and-rubber-tires-for-makeshift-drone-armor-95e817a1?mod=rss_worldnews" target="_blank">俄罗斯影子舰队为无人机加装渔网与橡胶轮胎装甲 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：俄影子舰队加固无人机，威胁能源出口与乌克兰战局</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>俄罗斯影子油轮船队为应对乌克兰无人机袭击，开始加装渔网、橡胶轮胎等简易装甲，以保护用于资助战争的石油出口收入；乌克兰正持续打击俄能源物流节点，黑海与波罗的海航运安全风险上升。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>俄罗斯寻求维持石油出口现金流并降低船只战损；乌克兰意图削弱俄战争融资能力；西方制裁联盟关注影子舰队规避行为，可能加强航运保险与船东审查；船东与保险商面临合规与安全成本上升。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>影子舰队武装化与袭击升级将提高俄油运输成本与制裁规避难度，推动原油贸易流进一步碎片化；若袭击导致运力损失，全球油轮有效供给趋紧，运价与地缘风险溢价将结构性抬升，并加速能源供应链区域化。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">[&#39;布伦特原油期货&#39;, &#39;乌拉尔原油价差&#39;, &#39;油轮运价指数（BDTI）&#39;, &#39;航运保险成本&#39;]</span>
+                            </div>
+                            <div class="market-logic">袭击风险与装甲化改造推高航运保险与运营成本，收紧影子 fleet 有效运力，支撑原油地缘风险溢价；乌拉尔贴水可能扩大，油轮运价获支撑，油价波动率上升，利空航空与运输板块成本端。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Russia’s Shadow Fleet Turns to Nets and Rubber Tir...</span>
+                            <span>Sat, 31 Oct 2026 23:00:00 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">资本市场/科技股</span>
+                                <span class="source-tag">WSJ Markets</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.2 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>7.5</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>9.2</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>7.8</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/finance/stocks/ai-selloff-deepens-oil-jumps-and-crypto-falls-4703d21b?mod=rss_markets_main" target="_blank">科技股抛售加剧，纳斯达克创逾一年最差月度表现 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：科技股抛售加剧，纳斯达克创逾一年最差月度表现</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>亚马逊与英特尔财报令人失望，加剧市场对AI资本开支回报与芯片需求的担忧，科技股抛售自我强化，纳斯达克指数迈向逾一年最差月度表现；资金从高估值成长股流向价值与小盘板块。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>科技巨头面临盈利兑现与资本开支纪律质疑；机构投资者调整持仓集中度；美联储关注金融条件收紧对通胀与增长的影响；散户与量化基金加速去杠杆。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>AI交易从普涨转向业绩验证，资本开支回报周期拉长可能抑制半导体与云计算产业链扩张；若抛售持续，将收紧科技企业融资条件，并推动全球权益资金再平衡，小盘与价值风格相对受益。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">[&#39;纳斯达克100指数&#39;, &#39;费城半导体指数（SOX）&#39;, &#39;10年期美债收益率&#39;, &#39;美元指数&#39;]</span>
+                            </div>
+                            <div class="market-logic">龙头财报不及预期触发盈利下修与估值去化，成长股风险溢价上升，资金流出科技板块；避险需求短期压收益率，但若通胀担忧回升则收益率反弹，美元受避险与利率预期双重影响，科技板块承压加剧波动。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Deepening Tech Selloff Pushes Nasdaq Toward Its Wo...</span>
+                            <span>Fri, 30 Oct 2026 19:25:00 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">货币政策/通胀</span>
+                                <span class="source-tag">WSJ World</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.1 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>8.0</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>8.5</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>7.8</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/world/uk/boe-survey-points-to-faster-price-rises-but-slowing-wage-growth-665e450b?mod=rss_worldnews" target="_blank">英国央行调查显示企业涨价预期升温但工资增长放缓 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：英国央行调查显示涨价预期升温，工资增长放缓</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>英国央行调查显示，企业预计未来12个月涨价幅度为3.8%，高于9月预期的3.7%；同时工资增长出现放缓迹象，显示通胀黏性与劳动力市场降温并存，货币政策路径更趋复杂。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>英国央行需在抑制通胀与支持增长间权衡；企业希望转嫁成本但面临需求疲软；工会关注实际工资与就业；投资者重新定价降息路径与英国资产风险溢价。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>涨价预期黏性意味着服务业通胀回落缓慢，限制英央行激进降息空间；工资放缓则缓解第二轮通胀效应，形成政策拉锯，可能延长高利率持续时间，并影响英国消费、房地产与企业投资。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">[&#39;英镑/美元&#39;, &#39;英国10年期国债收益率&#39;, &#39;富时100指数&#39;, &#39;英国利率期货&#39;]</span>
+                            </div>
+                            <div class="market-logic">涨价预期升温推迟降息定价，短端利率与英镑获支撑，金边债券收益率曲线趋陡；高利率持续压制地产与消费板块，富时100受英镑走强与全球风险偏好双重影响，波动率上升。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: BOE Survey Points to Faster Price Rises, But Slowi...</span>
+                            <span>Fri, 30 Oct 2026 10:10:00 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">半导体/全球贸易</span>
+                                <span class="source-tag">WSJ World</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.1 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>8.2</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>7.8</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.5</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/world/asia/south-koreas-chip-led-exports-accelerate-bringing-1-trln-annual-target-closer-5180b539?mod=rss_worldnews" target="_blank">韩国芯片出口加速，接近万亿美元年度目标 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：韩国芯片出口加速，强化全球半导体供应链地位</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>韩国芯片主导的出口加速增长，使其更接近全年1万亿美元出口目标；存储芯片与AI相关半导体需求强劲，韩国作为全球半导体供应链关键节点的地位进一步巩固。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>韩国政府希望以出口拉动增长并提升半导体战略地位；三星与SK海力士受益于AI存储需求但面临美国出口管制与竞争；美国关注供应链安全；中国作为最大市场与竞争对手态度复杂。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>韩国芯片出口强劲强化全球AI硬件供应链，但也加深对存储周期与地缘政策依赖；若美国进一步限制对华出口，韩国企业需在市场份额与合规风险间平衡，全球半导体产业链区域化与库存周期波动加剧。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">[&#39;韩国KOSPI指数&#39;, &#39;半导体ETF（SOXX/SMH）&#39;, &#39;韩元/美元&#39;, &#39;存储芯片现货价格&#39;]</span>
+                            </div>
+                            <div class="market-logic">出口加速提升三星与SK海力士盈利预期，支撑KOSPI与半导体板块估值；强劲出口与贸易顺差支撑韩元，但若AI需求预期回调或美国关税风险上升，板块波动加剧，存储价格周期成为核心定价变量。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: South Korea’s Chip-Led Exports Accelerate, Bringin...</span>
+                            <span>Sun, 01 Nov 2026 00:42:00 GMT</span>
+                        </div>
+                    </div>
+            </div>
+
+            <!-- 第二板块：计算技术与开源前沿观察 -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">计算技术与开源工程前沿</span>
+                    <span class="section-code">[SEC-02 / COMPUTING & OPEN SOURCE]</span>
+                </div>
+
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">系统安全/网络协议</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.8 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.5</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.8</span> &nbsp;•&nbsp; 
+                            工程落地:<span>9.2</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://atlasum.net/blog/cve-2026-98432-linux-ipv4-tcp-uaf" target="_blank">TCP释放后使用漏洞CVE-2026-98432，CVSS评分9.8 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：TCP严重漏洞影响全球网络基础设施，需紧急修复</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>该漏洞位于TCP协议栈内存生命周期管理路径，属于释放后使用（Use-After-Free）类型，CVSS 9.8，攻击者可利用畸形报文触发内核内存破坏，可能导致远程代码执行或系统崩溃，影响主流操作系统与网络设备。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>相比传统TCP漏洞，该缺陷绕过常规边界检查，利用连接状态转换中的竞态窗口，突破内核地址空间隔离；修复需重构套接字释放与重传队列的同步机制，解决高并发场景下内存回收与报文处理的安全瓶颈。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>全球云厂商、Linux发行版与网络设备商面临紧急补丁压力，供应链安全审查趋严；社区关注内核网络栈的自动化模糊测试与形式化验证，推动安全左移与运行时防护投入，安全壁垒从边界防御转向内核级内存安全。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">[&#39;AWS/Azure/GCP等公有云&#39;, &#39;Linux发行版与网络设备厂商&#39;, &#39;网络安全板块（防火墙/EDR）&#39;, &#39;云计算基础设施ETF&#39;]</span>
+                            </div>
+                            <div class="market-logic">高危漏洞迫使云厂商加速补丁与隔离，短期增加运维成本并可能引发服务降级风险，利空暴露的基础设施标的；同时提升网络安全预算与零信任架构需求，利好安全软件与内核防护厂商，行业定价权向高可信基础设施倾斜。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50319143" target="_blank">项目原帖: TCP Use-After-Free: CVE-2026-98432 / CVSS 9.8...</a>
+                            <span class="stat-badge">360 ★/pts &nbsp;|&nbsp; 171 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">AI推理系统/模型编排</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.4 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.8</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.5</span> &nbsp;•&nbsp; 
+                            工程落地:<span>7.8</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://github.com/guregodevo/memdoor/tree/main/examples/workflows/team-solve" target="_blank">Memdoor：5个Qwen3.8-27B模型组合在LiveCodeBench Hard上超越Fable 5 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：小模型组合超越大模型，革新AI推理与编排范式</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>Memdoor采用多模型编排架构，将5个Qwen3.8-27B开源模型通过路由、投票与记忆聚合机制协同推理，在LiveCodeBench Hard代码基准上超越更大规模闭源模型，核心在于推理时计算分配与模型间互补。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>突破单一超大模型在代码生成中的成本与延迟瓶颈，通过小模型并行与动态路由降低单位推理成本，同时利用集成投票提升复杂代码任务的正确率，缓解大模型幻觉与长尾性能不足问题。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区关注模型编排层能否成为独立商业层，开源权重模型组合可替代部分闭源API；技术壁垒从参数规模转向路由算法、推理调度与评测体系，推动AI推理基础设施从单模型服务向多模型编排平台演进。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">[&#39;闭源大模型API厂商（OpenAI/Anthropic）&#39;, &#39;AI推理云服务商&#39;, &#39;GPU算力租赁&#39;, &#39;开源模型生态&#39;]</span>
+                            </div>
+                            <div class="market-logic">小模型组合以更低成本达到领先性能，压制闭源大模型按token定价权，推动推理需求从超大模型向多模型并行转移；利好推理编排平台与开源权重生态，但可能降低单次推理GPU峰值需求，改变算力资本开支结构。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50320995" target="_blank">项目原帖: Memdoor: A team of 5 Qwen3.8-27B models beats...</a>
+                            <span class="stat-badge">92 ★/pts &nbsp;|&nbsp; 45 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">分布式数据库/一致性验证</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.2 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.2</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>7.8</span> &nbsp;•&nbsp; 
+                            工程落地:<span>8.5</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://jepsen.io/analyses/particledb-1.1.4" target="_blank">Jepsen发布ParticleDB 1.1.4一致性分析报告 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：分布式数据库一致性验证，保障生产系统可靠性</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>Jepsen对ParticleDB 1.1.4进行黑盒一致性测试，覆盖线性一致性、分区容忍与故障恢复场景，通过注入网络分区、时钟偏移与节点崩溃，验证分布式事务与复制协议在极端条件下的正确性。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>相比厂商自测，Jepsen以独立 adversarial 测试揭示分布式数据库在分区、重试与提交协议中的隐蔽一致性缺陷，帮助识别数据丢失、脏读与脑裂风险，提升生产环境可靠性验证标准。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区关注ParticleDB是否通过严格一致性验证，测试结果将影响其企业采用信心；Jepsen报告成为分布式数据库采购的重要参考，推动厂商公开可验证的正确性证据，抬高数据库可靠性门槛。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">[&#39;分布式数据库厂商（MongoDB/CockroachDB等）&#39;, &#39;云数据库服务（AWS Aurora/Azure Cosmos）&#39;, &#39;企业基础设施软件&#39;, &#39;数据库即服务赛道&#39;]</span>
+                            </div>
+                            <div class="market-logic">独立验证通过将增强ParticleDB商业信任度，挤压未经验证厂商的定价空间；若发现缺陷则引发客户迁移与品牌折价，推动企业采购向可验证一致性产品集中，数据库行业竞争从功能比拼转向正确性与可靠性证明。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50316100" target="_blank">项目原帖: Jepsen: ParticleDB 1.1.4...</a>
+                            <span class="stat-badge">206 ★/pts &nbsp;|&nbsp; 109 评论/分支</span>
+                        </div>
+                    </div>
+            </div>
+
+        </div>
+
+        <!-- 脚注 -->
+        <div class="footer">
+            多源聚合：CNBC Markets、Wall Street Journal、BBC World News、Hacker News、GitHub Trending。<br>
+            多维评级：宏观（地缘战略 / 市场敏感 / 结构外溢），技术（架构突破 / 商业重塑 / 工程落地）。仅供专业研判参考。
+        </div>
+    </div>
+</body>
+</html>
