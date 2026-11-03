@@ -71,7 +71,7 @@ class SearchEmailsArgs(BaseModel):
 
 
 class CreateCalendarEventArgs(BaseModel):
-    """从邮件中提炼具体日程、会议或还款截期 (DDL) 并持久化保存到待办日历池中"""
+    """仅保存本人已确认参与、被明确安排或必须办理的日程；普通活动邀请不创建。须先读完整邮件并调用 list_calendar_events 核对已有日程"""
 
     title: str = Field(description="日程标题 (如：季度战略复盘会、信用卡还款日、酒店入住)")
     event_date: str = Field(description="具体日期 (格式严格为 YYYY-MM-DD)", pattern=r"^\d{4}-\d{2}-\d{2}$")
@@ -87,11 +87,11 @@ class CreateCalendarEventArgs(BaseModel):
 
 
 class ListCalendarEventsArgs(BaseModel):
-    """查询日历待办池中当前所有活跃的待办日程"""
+    """查询当前所有活跃日程；本批次首次创建或删除日程前必须先查询并核对结果"""
 
 
 class RemoveCalendarEventArgs(BaseModel):
-    """从日历待办池中移除指定 ID 的日程事件 (如会议取消或改期重置)"""
+    """移除指定 ID 的日程；必须先调用 list_calendar_events 并核对待删除事项"""
 
     schedule_id: str = Field(description="要删除的日程唯一 ID (schedule_id)")
 
@@ -112,7 +112,7 @@ class CreateDraftArgs(BaseModel):
 
 @dataclass
 class ToolContext:
-    """贯穿 Agent 工具调用的全局执行上下文 (纯净无状态，由外部 Orchestrator 注入)"""
+    """贯穿 Agent 工具调用的执行上下文，包含当前批次的日程查询状态"""
 
     connection: ImapConnection
     repo: MessageRepo
@@ -122,6 +122,7 @@ class ToolContext:
     memory: InboxMemory
     current_code: str = "inbox"
     current_emails: list[Email] = field(default_factory=list)
+    calendar_checked: bool = field(default=False, init=False)
 
 
 # ==============================================================================
@@ -203,6 +204,13 @@ def _handle_search_emails(args: SearchEmailsArgs, ctx: ToolContext) -> dict[str,
 
 
 def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContext) -> dict[str, Any]:
+    if not ctx.calendar_checked:
+        return {
+            "status": "error",
+            "code": "calendar_check_required",
+            "message": "本批次尚未成功查询日程，请先调用 list_calendar_events，读取并核对已有日程后再创建日程。",
+        }
+
     title = args.title.strip()
     event_date = args.event_date.strip()
     m_id = (args.message_id or "").strip()
@@ -319,10 +327,18 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
 
 def _handle_list_calendar_events(_args: ListCalendarEventsArgs, ctx: ToolContext) -> dict[str, Any]:
     events = ctx.memory.get_active_schedules()
+    ctx.calendar_checked = True
     return {"status": "success", "count": len(events), "events": events}
 
 
 def _handle_remove_calendar_event(args: RemoveCalendarEventArgs, ctx: ToolContext) -> dict[str, Any]:
+    if not ctx.calendar_checked:
+        return {
+            "status": "error",
+            "code": "calendar_check_required",
+            "message": "本批次尚未成功查询日程，请先调用 list_calendar_events，读取并核对已有日程后再删除日程。",
+        }
+
     success = ctx.memory.remove_schedule(args.schedule_id)
     if success:
         ctx.memory.save()
