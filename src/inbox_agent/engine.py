@@ -154,6 +154,8 @@ class AgentEngine:
 
         while turn < max_turns:
             turn += 1
+            # 只认可本轮开始前已加入上下文的查询结果，禁止首次查询与变更在同轮放行。
+            calendar_checked_at_turn_start = context.calendar_checked
             if context.connection and context.connection.is_connected():
                 try:
                     context.connection.noop()
@@ -226,7 +228,14 @@ class AgentEngine:
                 parsed_args = parsed_raw if isinstance(parsed_raw, dict) else {}
                 print(f"    -> 调用工具 `{fn_name}`: {list(parsed_args.keys())}")
 
-                tool_result = execute_tool(fn_name, parsed_args, context)
+                if fn_name in {"create_calendar_event", "remove_calendar_event"} and not calendar_checked_at_turn_start:
+                    tool_result = {
+                        "status": "error",
+                        "code": "calendar_check_required",
+                        "message": "本轮开始前尚未收到日程查询结果。请先调用 list_calendar_events，等待结果并核对，再在后续轮次重试；同批次后续操作可复用结果。",
+                    }
+                else:
+                    tool_result = execute_tool(fn_name, parsed_args, context)
 
                 # 仅当 apply_labels 成功执行时，才确立邮件的最终去向并加入持久化集合
                 if tool_result.get("status") == "success":
