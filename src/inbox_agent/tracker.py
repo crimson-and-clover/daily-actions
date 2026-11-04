@@ -42,10 +42,10 @@ class BatchTracker:
 
     def __init__(self, user_email: str = ""):
         self.user_email = user_email or GMAIL_USER
-        # 邮件映射快速索引：按原生 UID 缓存 Email 实体，便于快速提取主题、发件人等元数据
-        self.email_map: dict[int, Email] = {}
-        # 决策映射：记录每个 UID 的来源、唯一最终去向与处置理由
-        self.triage_decisions: dict[int, EmailDecision] = {}
+        # 邮件映射快速索引：按 Message-ID 缓存 Email 实体，便于快速提取主题、发件人等元数据
+        self.email_map: dict[str, Email] = {}
+        # 决策映射：记录每个 Message-ID 的来源、唯一最终去向与处置理由
+        self.triage_decisions: dict[str, EmailDecision] = {}
         # 日程池列表：收集大模型通过 create_calendar_event 成功提取的新增日程
         self.schedules: list[dict[str, Any]] = []
         # 草稿生成记录：收集大模型通过 create_email_draft 拟定的回复草稿
@@ -54,38 +54,28 @@ class BatchTracker:
     def register_batch_emails(self, emails: Sequence[Email]) -> None:
         """
         在每批次处理开始前，注册当前批次的所有 Email 实体。
-        建立 UID -> Email 快速索引，并为尚未追踪的邮件初始化空决策状态。
+        建立 Message-ID -> Email 快速索引，并为尚未追踪的邮件初始化空决策状态。
         """
         for e in emails:
-            if e.uid is not None:
-                self.email_map[e.uid] = e
-                if e.uid not in self.triage_decisions:
-                    self.triage_decisions[e.uid] = EmailDecision()
+            if e.message_id:
+                self.email_map[e.message_id] = e
+                self.triage_decisions.setdefault(e.message_id, EmailDecision())
 
     def record_route(
         self,
-        uids: list[int],
+        message_ids: list[str],
         destination: str,
         tldr: str = "",
         source_code: str = "inbox",
         is_internal_ci: bool = False,
     ) -> None:
-        """
-        记录成功处置的来源与唯一最终去向，不维护底层标签操作历史。
-
-        Args:
-            uids: 受到本次标签操作影响的邮件 UID 列表
-            destination: 最后一次成功处置的唯一业务去向
-            tldr: 模型的处置说明或备忘
-            source_code: 首次成功处置时所在的目录代码
-            is_internal_ci: 是否属于内部 CI / 自动化任务简报（硬规则过滤）
-        """
+        """按已注册邮件的 Message-ID 记录成功处置，避免目录间 UID 碰撞。"""
         if destination not in DESTINATION_CODES:
             raise ValueError("每次成功处置必须明确一个最终去向")
-        for uid in uids:
-            if uid not in self.triage_decisions:
-                self.triage_decisions[uid] = EmailDecision()
-            dec = self.triage_decisions[uid]
+        if any(message_id not in self.email_map for message_id in message_ids):
+            raise ValueError("处置记录必须绑定已注册的邮件 Message-ID")
+        for message_id in message_ids:
+            dec = self.triage_decisions[message_id]
             if dec.source_code is None:
                 dec.source_code = source_code
             dec.destination = destination
@@ -145,8 +135,8 @@ class BatchTracker:
     def rescued_items(self) -> list[dict[str, Any]]:
         """按最终去向投影垃圾箱解救项，后续改判会自动反映在结果中。"""
         return [
-            self._email_to_report_dict(self.email_map.get(uid), uid=uid, tldr=dec.tldr)
-            for uid, dec in self.triage_decisions.items()
+            self._email_to_report_dict(self.email_map.get(message_id), uid=self.email_map[message_id].uid, tldr=dec.tldr)
+            for message_id, dec in self.triage_decisions.items()
             if dec.source_code == "spam" and dec.destination == "inbox"
         ]
 
@@ -157,13 +147,13 @@ class BatchTracker:
         判定准则：最终 destination 为 inbox；未处置邮件不算已确认留存。
         """
         result = []
-        for uid, dec in self.triage_decisions.items():
+        for message_id, dec in self.triage_decisions.items():
             if dec.destination == "inbox":
-                e = self.email_map.get(uid)
-                result.append(self._email_to_report_dict(e, uid=uid, tldr=dec.tldr))
+                e = self.email_map.get(message_id)
+                result.append(self._email_to_report_dict(e, uid=self.email_map[message_id].uid, tldr=dec.tldr))
         return result
 
-    def _is_ci_email(self, uid: int, dec: EmailDecision) -> bool:
+    def _is_ci_email(self, message_id: str, dec: EmailDecision) -> bool:
         """
         判定某封邮件是否属于内部自动化 CI 任务简报（需排除在简报展示与通知统计之外）。
 
@@ -173,7 +163,7 @@ class BatchTracker:
         """
         if dec.is_internal_ci:
             return True
-        e = self.email_map.get(uid)
+        e = self.email_map.get(message_id)
         if not e:
             return False
         return is_internal_ci(
@@ -186,33 +176,33 @@ class BatchTracker:
     def systems(self) -> list[dict[str, Any]]:
         """最终去向为系统通知的邮件，过滤内部 CI 报告。"""
         result = []
-        for uid, dec in self.triage_decisions.items():
+        for message_id, dec in self.triage_decisions.items():
             if dec.destination == "system_notification":
                 # 过滤自建 CI 任务报告，不在日报展示层冗余呈现（严格对齐发件人校验，防止外部仿冒前缀隐身）
-                if self._is_ci_email(uid, dec):
+                if self._is_ci_email(message_id, dec):
                     continue
-                e = self.email_map.get(uid)
-                result.append(self._email_to_report_dict(e, uid=uid, tldr=dec.tldr))
+                e = self.email_map.get(message_id)
+                result.append(self._email_to_report_dict(e, uid=self.email_map[message_id].uid, tldr=dec.tldr))
         return result
 
     @property
     def marketings(self) -> list[dict[str, Any]]:
         """最终去向为商业推广的邮件。"""
         result = []
-        for uid, dec in self.triage_decisions.items():
+        for message_id, dec in self.triage_decisions.items():
             if dec.destination == "promotions":
-                e = self.email_map.get(uid)
-                result.append(self._email_to_report_dict(e, uid=uid, tldr=dec.tldr))
+                e = self.email_map.get(message_id)
+                result.append(self._email_to_report_dict(e, uid=self.email_map[message_id].uid, tldr=dec.tldr))
         return result
 
     @property
     def spams(self) -> list[dict[str, Any]]:
         """最终去向为 Spam 的邮件。"""
         result = []
-        for uid, dec in self.triage_decisions.items():
+        for message_id, dec in self.triage_decisions.items():
             if dec.destination == "spam":
-                e = self.email_map.get(uid)
-                result.append(self._email_to_report_dict(e, uid=uid, tldr=dec.tldr))
+                e = self.email_map.get(message_id)
+                result.append(self._email_to_report_dict(e, uid=self.email_map[message_id].uid, tldr=dec.tldr))
         return result
 
     @property
@@ -224,9 +214,9 @@ class BatchTracker:
     def systems_moved_count(self) -> int:
         """从收件箱成功移入系统通知目录的邮件总数（排除内部自发 CI 简报，与 systems 列表展示口径严格一致）"""
         count = 0
-        for uid, d in self.triage_decisions.items():
+        for message_id, d in self.triage_decisions.items():
             if d.source_code == "inbox" and d.destination == "system_notification":
-                if self._is_ci_email(uid, d):
+                if self._is_ci_email(message_id, d):
                     continue
                 count += 1
         return count

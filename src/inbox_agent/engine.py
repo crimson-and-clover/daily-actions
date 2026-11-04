@@ -125,8 +125,7 @@ class AgentEngine:
         context.fully_read_emails.clear()
         memory = context.memory
 
-        # 建立当前批次 UID -> Message-ID 与垃圾状态映射
-        uid_to_msg_id: dict[int, str] = {e.uid: e.message_id for e in batch_emails if e.message_id}
+        # 建立当前批次按 Message-ID 索引的垃圾状态映射
         msg_id_spam_map: dict[str, bool] = {
             e.message_id: (context.current_code == "spam") for e in batch_emails if e.message_id
         }
@@ -241,33 +240,19 @@ class AgentEngine:
 
                 # 仅当 route_emails 成功执行时，才确立邮件的最终去向并加入持久化集合
                 if tool_result.get("status") == "success":
-                    affected_uids = tool_result.get("affected_uids", [])
                     if fn_name == "route_emails":
                         destination = tool_result["destination"]
                         tldr = parsed_args.get("tldr", "")
-                        for u in affected_uids:
-                            try:
-                                u_int = int(u)
-                                if u_int in uid_to_msg_id:
-                                    m_id = uid_to_msg_id[u_int]
-                                    dispositioned_msg_ids.add(m_id)
-                                    # 动态追踪垃圾邮件研判决策
-                                    msg_id_spam_map[m_id] = destination == "spam"
-                            except (ValueError, TypeError):
-                                continue
-
+                        message_ids = [item["message_id"] for item in tool_result["affected_emails"]]
+                        for message_id in message_ids:
+                            dispositioned_msg_ids.add(message_id)
+                            msg_id_spam_map[message_id] = destination == "spam"
                         if tracker:
-                            valid_uids: list[int] = []
-                            for u in affected_uids:
-                                try:
-                                    valid_uids.append(int(u))
-                                except (ValueError, TypeError):
-                                    pass
                             tracker.record_route(
-                                uids=valid_uids,
+                                message_ids=message_ids,
                                 destination=destination,
                                 tldr=tldr,
-                                source_code=context.current_code,
+                                source_code=tool_result["source_code"],
                             )
                     elif fn_name == "create_calendar_event" and tracker:
                         if tool_result.get("schedule"):

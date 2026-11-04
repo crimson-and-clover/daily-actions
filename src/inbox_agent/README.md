@@ -10,6 +10,7 @@
    - 告别硬编码脚本流水线，赋予 Agent 专属邮件工具箱（`route_emails`, `mark_email_flags`, `read_email_content`, `search_emails`, `create_calendar_event`, `list_calendar_events`, `remove_calendar_event`, `create_email_draft`）。
    - 细化多维度业务识别：验证码安全口令、银行证券动账账单、政务事务公函、商业推广、系统通知、日程待办与恶意垃圾。
    - 邮件分流、旗标、日程及关联草稿写操作前必须调用 `read_email_content` 完整阅读正文；工具层按来源邮件校验，引擎要求完整结果已在前一轮返回，截断或读取失败不放行。
+   - 搜索和阅读可跨目录补充上下文；邮件分流、旗标修改仅限当前批次目录及 UID，执行前整批校验。成功结果携带真实邮件身份，已处理状态及 tracker 按 Message-ID 记录。
 2. **10 封独立上下文批次机制 (Fresh Context Batching)**：
    - 每次处理 10 封待办邮件（包括收件箱新信与垃圾箱复核），开启全新的对话上下文，根绝 Token 冗余膨胀与注意力衰减。
    - 每批次处理完毕即时将状态与加密记忆持久化（Fernet AES），容错率高。
