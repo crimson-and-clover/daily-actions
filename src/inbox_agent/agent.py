@@ -37,6 +37,7 @@ from inbox_agent.imap import (
 )
 from inbox_agent.imap.models import Email
 from inbox_agent.memory import InboxMemory
+from inbox_agent.profile import load_user_profile
 from inbox_agent.renderer import render_email_report
 from inbox_agent.rules import is_internal_ci
 from inbox_agent.tools import ToolContext
@@ -60,6 +61,8 @@ def main():
     """日常收件箱巡检与分流主工作流 (适用于 GitHub Actions CI)"""
     # 基础配置项校验：确保模型 API KEY 与 Gmail 鉴权信息齐全
     validate_config(require_deepseek=True)
+    # 在连接邮箱或执行任何邮件操作前确认个人配置可用。
+    load_user_profile()
     now_dt = get_now_bjt()
     print(f"=== [Inbox Agent] 智能邮件助手启动 ({now_dt.strftime('%Y-%m-%d %H:%M:%S')} BJT) ===")
 
@@ -139,15 +142,10 @@ def main():
         archive_success = False
         if rule_uids:
             try:
-                label_service.set_labels(
+                label_service.route_emails(uids=rule_uids, destination="system_notification")
+                inbox_tracker.record_route(
                     uids=rule_uids,
-                    add=["system_notification"],
-                    remove=["inbox"],
-                )
-                inbox_tracker.record_labels(
-                    uids=rule_uids,
-                    add=["system_notification"],
-                    remove=["inbox"],
+                    destination="system_notification",
                     tldr="系统自动化任务简报/CI通知（硬规则自动归档）",
                     is_internal_ci=True,
                 )
@@ -228,13 +226,8 @@ def main():
             )
             print(f"  [垃圾箱复核批次 {s_batch_num}/{total_spam_batches} 总结]: {s_summary}")
 
-            # 将本批经 Agent 复核后确认未解救（依然属于真实垃圾）的邮件标记为 processed(is_spam=True)
-            for item in s_batch:
-                m_id = item.message_id
-                uid = item.uid
-                is_rescued = any(r.get("uid") == uid for r in spam_tracker.rescued_items)
-                if not is_rescued and m_id and not memory.is_processed(m_id):
-                    memory.mark_processed(m_id, is_spam=True)
+            # 已处理状态仅由引擎根据成功的 route_emails 提交。
+            # 未解救不等于已确认是垃圾；读取失败或尚未处置的邮件留待下次复核。
             memory.save()
 
     # 所有 IMAP 交互与工具调用完毕，安全关闭连接

@@ -18,6 +18,7 @@ from inbox_agent.config import (
     MAX_AGENT_TURNS,
 )
 from inbox_agent.imap.models import Email
+from inbox_agent.profile import load_user_profile
 from inbox_agent.tools import AGENT_TOOLS, ToolContext, execute_tool
 from inbox_agent.tracker import BatchTracker
 from utils.json_parser import parse_json_safely
@@ -37,6 +38,7 @@ def build_system_prompt(user_email: str, current_code: str = "inbox") -> str:
         current_weekday=get_bjt_weekday_str(),
         user_email=user_email,
         current_code=current_code,
+        user_profile=load_user_profile(),
     )
 
 
@@ -118,6 +120,9 @@ class AgentEngine:
 
         # 挂载当前批次邮件实体列表至 ToolContext 供各工具即时访问与元数据提取
         context.current_emails = list(batch_emails)
+        # 每批上下文独立，上一批的日程查询不能作为本批操作的依据。
+        context.calendar_checked = False
+        context.fully_read_emails.clear()
         memory = context.memory
 
         # 建立当前批次 UID -> Message-ID 与垃圾状态映射
@@ -150,6 +155,9 @@ class AgentEngine:
 
         while turn < max_turns:
             turn += 1
+            # 只认可本轮开始前已加入上下文的查询结果，禁止首次查询与变更在同轮放行。
+            calendar_checked_at_turn_start = context.calendar_checked
+            read_snapshot = dict(context.fully_read_emails)
             if context.connection and context.connection.is_connected():
                 try:
                     context.connection.noop()
@@ -200,8 +208,10 @@ class AgentEngine:
                     reminder = (
                         f"当前批次中仍有 {len(unhandled_emails)} 封待办邮件尚未调用工具明确去向：\n"
                         + "\n".join(unhandled_list)
-                        + "\n请为这些邮件调用 `apply_labels` 明确处置去向。"
-                        "若判断确认保留在当前目录随时查阅（无需增删标签），请调用 `apply_labels(email_uids=[...], add=[], remove=[], tldr='...')` 明确确认留存并记录备忘。"
+                        + "\n请先按系统规则调用 `read_email_content` 完整阅读尚未读全的邮件，再为具备操作条件的邮件调用 `route_emails` 明确处置去向。"
+                        "每封邮件只能选择一个 destination；保留收件箱使用 `route_emails(email_uids=[...], destination='inbox', tldr='...')`，确认垃圾则选择 spam。"
+                        "读取失败或仍被截断的邮件可保留未决并说明原因，不得为完成批次而绕过全文阅读；"
+                        "学校活动邀请、可选报名等不符合日程准入规则的邮件只做分类，不得为补齐处置而创建日程。"
                     )
                     messages.append({"role": "user", "content": reminder})
                     continue
@@ -220,14 +230,20 @@ class AgentEngine:
                 parsed_args = parsed_raw if isinstance(parsed_raw, dict) else {}
                 print(f"    -> 调用工具 `{fn_name}`: {list(parsed_args.keys())}")
 
-                tool_result = execute_tool(fn_name, parsed_args, context)
+                if fn_name in {"create_calendar_event", "remove_calendar_event"} and not calendar_checked_at_turn_start:
+                    tool_result = {
+                        "status": "error",
+                        "code": "calendar_check_required",
+                        "message": "本轮开始前尚未收到日程查询结果。请先调用 list_calendar_events，等待结果并核对，再在后续轮次重试；同批次后续操作可复用结果。",
+                    }
+                else:
+                    tool_result = execute_tool(fn_name, parsed_args, context, read_snapshot=read_snapshot)
 
-                # 仅当 apply_labels 成功执行时，才确立邮件的最终去向并加入持久化集合
+                # 仅当 route_emails 成功执行时，才确立邮件的最终去向并加入持久化集合
                 if tool_result.get("status") == "success":
                     affected_uids = tool_result.get("affected_uids", [])
-                    if fn_name == "apply_labels":
-                        adds = parsed_args.get("add", [])
-                        removes = parsed_args.get("remove", [])
+                    if fn_name == "route_emails":
+                        destination = tool_result["destination"]
                         tldr = parsed_args.get("tldr", "")
                         for u in affected_uids:
                             try:
@@ -236,10 +252,7 @@ class AgentEngine:
                                     m_id = uid_to_msg_id[u_int]
                                     dispositioned_msg_ids.add(m_id)
                                     # 动态追踪垃圾邮件研判决策
-                                    if "spam" in adds:
-                                        msg_id_spam_map[m_id] = True
-                                    elif "spam" in removes and ("inbox" in adds or not adds):
-                                        msg_id_spam_map[m_id] = False
+                                    msg_id_spam_map[m_id] = destination == "spam"
                             except (ValueError, TypeError):
                                 continue
 
@@ -250,12 +263,11 @@ class AgentEngine:
                                     valid_uids.append(int(u))
                                 except (ValueError, TypeError):
                                     pass
-                            tracker.record_labels(
+                            tracker.record_route(
                                 uids=valid_uids,
-                                add=adds,
-                                remove=removes,
+                                destination=destination,
                                 tldr=tldr,
-                                current_code=context.current_code,
+                                source_code=context.current_code,
                             )
                     elif fn_name == "create_calendar_event" and tracker:
                         if tool_result.get("schedule"):
@@ -276,7 +288,7 @@ class AgentEngine:
                 })
 
         # 批次提交持久化状态：
-        # 严格基于 dispositioned_msg_ids（仅经 apply_labels 成功处置并确立去向的邮件）入库
+        # 严格基于 dispositioned_msg_ids（仅经 route_emails 成功处置并确立去向的邮件）入库
         # 彻底杜绝工具调用失败中途退出时未处置邮件被误标为已处理
         submitted_count = 0
         for e in batch_emails:

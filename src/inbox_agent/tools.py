@@ -1,14 +1,15 @@
 """
 Inbox Agent 工具系统 (Tools Definition & Modular Dispatcher)
-基于单一标签原语 (apply_labels) 与正交日历、草稿、检索工具矩阵，全部工具由 Pydantic 自动导出
+基于单一去向处置 (route_emails) 与独立的日历、草稿、检索工具，全部工具由 Pydantic 自动导出
 """
 
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import openai
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from inbox_agent.imap import (
     LABEL_SPECS,
@@ -27,24 +28,21 @@ from utils.timezone import get_now_bjt, parse_bjt_datetime
 # ==============================================================================
 
 
-class ApplyLabelsArgs(BaseModel):
-    """批量变更邮件标签（归档、分类、移入垃圾箱或解救）"""
+class RouteEmailsArgs(BaseModel):
+    """完整正文返回后选择唯一最终去向（包含留存 Inbox）；程序统一互斥分流，禁止 Trash"""
+
+    model_config = ConfigDict(extra="forbid")
 
     email_uids: list[int] = Field(description="邮件 UID 列表")
-    add: list[str] = Field(
-        default_factory=list,
-        description="添加的标签: promotions(推广), system_notification(系统通知), verification_code(验证码), finance_banking(账单), archive(归档), spam(垃圾), trash(废弃), inbox(收件箱)",
-    )
-    remove: list[str] = Field(
-        default_factory=list,
-        description="移除的标签: inbox(移出收件箱), spam(解救垃圾) 等",
+    destination: Literal["inbox", "archive", "system_notification", "promotions", "verification_code", "finance_banking", "spam"] = Field(
+        description="唯一最终去向：inbox 留存收件箱，或选择 archive/system_notification/promotions/verification_code/finance_banking/spam；其他去向会被移除，禁止 trash。",
     )
     tldr: str = Field(default="", description="处置简要理由或备忘")
     code: str | None = Field(default=None, description="UID 所属目录的标签代码，默认沿用当前运行模式目录")
 
 
 class MarkFlagsArgs(BaseModel):
-    """调整邮件的已读/未读状态或标星置顶旗标"""
+    """须先完整读取对应邮件并等待结果，再调整已读/未读或星标"""
 
     email_uids: list[int] = Field(description="邮件 UID 列表 (int)")
     is_read: bool | None = Field(default=None, description="是否标记已读 (True=已读, False=未读)")
@@ -71,7 +69,7 @@ class SearchEmailsArgs(BaseModel):
 
 
 class CreateCalendarEventArgs(BaseModel):
-    """从邮件中提炼具体日程、会议或还款截期 (DDL) 并持久化保存到待办日历池中"""
+    """仅保存本人已确认参与、被明确安排或必须办理的日程；普通活动邀请不创建。须先读完整邮件并调用 list_calendar_events 核对已有日程"""
 
     title: str = Field(description="日程标题 (如：季度战略复盘会、信用卡还款日、酒店入住)")
     event_date: str = Field(description="具体日期 (格式严格为 YYYY-MM-DD)", pattern=r"^\d{4}-\d{2}-\d{2}$")
@@ -87,22 +85,24 @@ class CreateCalendarEventArgs(BaseModel):
 
 
 class ListCalendarEventsArgs(BaseModel):
-    """查询日历待办池中当前所有活跃的待办日程"""
+    """查询当前所有活跃日程；本批次首次创建或删除日程前必须先查询并核对结果"""
 
 
 class RemoveCalendarEventArgs(BaseModel):
-    """从日历待办池中移除指定 ID 的日程事件 (如会议取消或改期重置)"""
+    """完整阅读取消/改期通知并查询已有日程后，移除对应事项；须传入该通知的 message_id"""
 
     schedule_id: str = Field(description="要删除的日程唯一 ID (schedule_id)")
+    message_id: str = Field(description="本次取消或改期通知邮件的 Message-ID，须先完整读取该通知，不是原日程的关联邮件 ID")
 
 
 class CreateDraftArgs(BaseModel):
-    """在 Gmail 草稿箱中创建一封邮件草稿 (支持新建或指定原邮件 ID 回复)"""
+    """先完整阅读来源邮件再创建草稿；新信用 source_message_id，回复用 in_reply_to 关联"""
 
     to_addr: str = Field(description="收件人邮箱地址")
     subject: str = Field(description="草稿主题")
     body: str = Field(description="草稿正文内容")
     in_reply_to: str = Field(default="", description="关联回复的原邮件 Message-ID (可选)")
+    source_message_id: str = Field(default="", description="新建草稿时必填：已完整阅读的来源邮件 Message-ID；回复草稿也可用 in_reply_to 关联")
 
 
 # ==============================================================================
@@ -112,7 +112,7 @@ class CreateDraftArgs(BaseModel):
 
 @dataclass
 class ToolContext:
-    """贯穿 Agent 工具调用的全局执行上下文 (纯净无状态，由外部 Orchestrator 注入)"""
+    """贯穿 Agent 工具调用的执行上下文，包含当前批次的日程查询状态"""
 
     connection: ImapConnection
     repo: MessageRepo
@@ -122,6 +122,9 @@ class ToolContext:
     memory: InboxMemory
     current_code: str = "inbox"
     current_emails: list[Email] = field(default_factory=list)
+    calendar_checked: bool = field(default=False, init=False)
+    # 真实目录名 + UID -> Message-ID，避免不同目录的 UID 碰撞。
+    fully_read_emails: dict[tuple[str, int], str] = field(default_factory=dict, init=False)
 
 
 # ==============================================================================
@@ -129,40 +132,27 @@ class ToolContext:
 # ==============================================================================
 
 
-def _handle_apply_labels(args: ApplyLabelsArgs, ctx: ToolContext) -> dict[str, Any]:
+def _handle_route_emails(args: RouteEmailsArgs, ctx: ToolContext) -> dict[str, Any]:
     uids = args.email_uids
-    add = [a.strip() for a in args.add if a.strip()]
-    remove = [r.strip() for r in args.remove if r.strip()]
+    destination = args.destination
     tldr = args.tldr
 
     if not uids:
         return {"status": "error", "message": "email_uids 不能为空"}
-
-    # 校验标签代码是否合法
-    invalid = [c for c in add + remove if c not in LABEL_SPECS]
-    if invalid:
-        return {
-            "status": "error",
-            "message": f"未定义的标签代码: {invalid}，合法代码为: {sorted(list(LABEL_SPECS.keys()))}",
-        }
 
     # 切换至 UID 所属的目标目录上下文
     code = args.code or ctx.current_code
     folder = LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code
     ctx.connection.select_folder(folder)
 
-    # 底层执行原子标签操作
-    ctx.label_service.set_labels(uids=uids, add=add, remove=remove)
+    ctx.label_service.route_emails(uids=uids, destination=destination)
 
-    add_names = [LABEL_SPECS[a].label_name for a in add]
-    remove_names = [LABEL_SPECS[r].label_name for r in remove]
     return {
         "status": "success",
         "affected_uids": uids,
-        "added_labels": add_names,
-        "removed_labels": remove_names,
+        "destination": destination,
         "tldr": tldr,
-        "message": f"成功为 {len(uids)} 封邮件变更标签: +{add_names} -{remove_names}",
+        "message": f"成功将 {len(uids)} 封邮件分流至唯一去向 {destination}",
     }
 
 
@@ -185,7 +175,11 @@ def _handle_mark_flags(args: MarkFlagsArgs, ctx: ToolContext) -> dict[str, Any]:
 
 def _handle_read_email_content(args: ReadEmailContentArgs, ctx: ToolContext) -> dict[str, Any]:
     code = args.code or ctx.current_code
-    return ctx.repo.read_email_content(email_uid=args.email_uid, code=code, max_length=args.max_length)
+    result = ctx.repo.read_email_content(email_uid=args.email_uid, code=code, max_length=args.max_length)
+    if result.get("status") == "success" and result.get("truncated") is False:
+        folder = LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code
+        ctx.fully_read_emails[(folder, args.email_uid)] = (result.get("message_id") or "").strip()
+    return result
 
 
 def _handle_search_emails(args: SearchEmailsArgs, ctx: ToolContext) -> dict[str, Any]:
@@ -203,6 +197,13 @@ def _handle_search_emails(args: SearchEmailsArgs, ctx: ToolContext) -> dict[str,
 
 
 def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContext) -> dict[str, Any]:
+    if not ctx.calendar_checked:
+        return {
+            "status": "error",
+            "code": "calendar_check_required",
+            "message": "本批次尚未成功查询日程，请先调用 list_calendar_events，读取并核对已有日程后再创建日程。",
+        }
+
     title = args.title.strip()
     event_date = args.event_date.strip()
     m_id = (args.message_id or "").strip()
@@ -319,10 +320,18 @@ def _handle_create_calendar_event(args: CreateCalendarEventArgs, ctx: ToolContex
 
 def _handle_list_calendar_events(_args: ListCalendarEventsArgs, ctx: ToolContext) -> dict[str, Any]:
     events = ctx.memory.get_active_schedules()
+    ctx.calendar_checked = True
     return {"status": "success", "count": len(events), "events": events}
 
 
 def _handle_remove_calendar_event(args: RemoveCalendarEventArgs, ctx: ToolContext) -> dict[str, Any]:
+    if not ctx.calendar_checked:
+        return {
+            "status": "error",
+            "code": "calendar_check_required",
+            "message": "本批次尚未成功查询日程，请先调用 list_calendar_events，读取并核对已有日程后再删除日程。",
+        }
+
     success = ctx.memory.remove_schedule(args.schedule_id)
     if success:
         ctx.memory.save()
@@ -354,7 +363,7 @@ def _handle_create_email_draft(args: CreateDraftArgs, ctx: ToolContext) -> dict[
 # ==============================================================================
 
 TOOL_REGISTRY: dict[str, tuple[type[BaseModel], Any]] = {
-    "apply_labels": (ApplyLabelsArgs, _handle_apply_labels),
+    "route_emails": (RouteEmailsArgs, _handle_route_emails),
     "mark_email_flags": (MarkFlagsArgs, _handle_mark_flags),
     "read_email_content": (ReadEmailContentArgs, _handle_read_email_content),
     "search_emails": (SearchEmailsArgs, _handle_search_emails),
@@ -372,7 +381,43 @@ AGENT_TOOLS: list[dict[str, Any]] = [
 ]
 
 
-def execute_tool(fn_name: str, args: dict[str, Any] | BaseModel, context: ToolContext) -> dict[str, Any]:
+def _check_full_read(
+    args: BaseModel,
+    context: ToolContext,
+    receipts: Mapping[tuple[str, int], str],
+) -> dict[str, Any] | None:
+    """邮件写操作须绑定已完整读取的来源；引擎传入上一轮可见的读取记录。"""
+    if isinstance(args, (RouteEmailsArgs, MarkFlagsArgs)):
+        code = args.code or context.current_code
+        folder = LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code
+        missing = [uid for uid in args.email_uids if (folder, uid) not in receipts]
+        if not missing:
+            return None
+        detail = f"目录 {folder} 中的 UID {missing}"
+    elif isinstance(args, (CreateCalendarEventArgs, RemoveCalendarEventArgs, CreateDraftArgs)):
+        if isinstance(args, CreateDraftArgs):
+            message_ids = {value.strip() for value in (args.in_reply_to, args.source_message_id) if value.strip()}
+        else:
+            message_ids = {args.message_id.strip()} if args.message_id.strip() else set()
+        if message_ids and message_ids <= set(receipts.values()):
+            return None
+        detail = "操作关联的来源邮件（新建草稿须提供 source_message_id，日程操作须提供通知邮件的 message_id）"
+    else:
+        return None
+    return {
+        "status": "error",
+        "code": "email_read_required",
+        "message": f"尚未收到{detail}的完整正文。请先调用 read_email_content；truncated=true 时增大 max_length 重读，等待完整结果返回后再操作。",
+    }
+
+
+def execute_tool(
+    fn_name: str,
+    args: dict[str, Any] | BaseModel,
+    context: ToolContext,
+    *,
+    read_snapshot: Mapping[tuple[str, int], str] | None = None,
+) -> dict[str, Any]:
     """统一分发并执行大模型发起的工具调用，入参经 Pydantic 模型严格校验后传入对应 Handler"""
     if fn_name not in TOOL_REGISTRY:
         return {"status": "error", "message": f"未知的工具名称: '{fn_name}'"}
@@ -382,6 +427,9 @@ def execute_tool(fn_name: str, args: dict[str, Any] | BaseModel, context: ToolCo
     except Exception as e:
         return {"status": "error", "message": f"参数校验失败: {e}"}
     try:
+        read_error = _check_full_read(validated_args, context, context.fully_read_emails if read_snapshot is None else read_snapshot)
+        if read_error:
+            return read_error
         return handler(validated_args, context)
     except Exception as e:
         return {"status": "error", "message": f"执行工具 '{fn_name}' 异常: {e}"}
