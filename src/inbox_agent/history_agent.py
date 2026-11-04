@@ -105,6 +105,7 @@ def main():
         batch_to_notif: list[int] = []
         batch_to_promo: list[int] = []
         batch_to_archive: list[int] = []
+        batch_to_inbox: list[int] = []
 
         for item in batch:
             # 心跳保活：防止 LLM 研判期间 IMAP 连接因闲置超时被断开
@@ -146,6 +147,8 @@ def main():
                     batch_to_archive.append(uid)
                 print(f"  [决策: 通用归档] '{subject}' (原因: {reason})")
             elif action == "keep_inbox":
+                if uid:
+                    batch_to_inbox.append(uid)
                 kept_items.append({**item.to_dict(), **decision})
                 print(f"  [决策: 保留收件箱] '{subject}' (原因: {reason})")
 
@@ -156,19 +159,21 @@ def main():
 
         # 本批次研判完成，立即执行 IMAP 批量动作
         if conn.is_connected():
+            if batch_to_inbox:
+                label_service.route_emails(batch_to_inbox, destination="inbox")
             if batch_to_delete:
-                label_service.set_labels(batch_to_delete, add=["trash"], remove=["inbox"])
+                label_service.route_emails(batch_to_delete, destination="trash")
                 b_del = len(batch_to_delete)
                 deleted_count += b_del
                 history_memory.record_pruned(b_del)
             if batch_to_notif:
-                label_service.set_labels(batch_to_notif, add=["system_notification"], remove=["inbox"])
+                label_service.route_emails(batch_to_notif, destination="system_notification")
                 notif_archived_count += len(batch_to_notif)
             if batch_to_promo:
-                label_service.set_labels(batch_to_promo, add=["promotions"], remove=["inbox"])
+                label_service.route_emails(batch_to_promo, destination="promotions")
                 promo_archived_count += len(batch_to_promo)
             if batch_to_archive:
-                label_service.set_labels(batch_to_archive, add=["archive"], remove=["inbox"])
+                label_service.route_emails(batch_to_archive, destination="archive")
                 gen_archived_count += len(batch_to_archive)
 
         # 核心：每完成一个批次立即持久化保存加密记忆库！

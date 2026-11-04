@@ -4,10 +4,11 @@ Inbox Agent 决策与报表数据追踪器 (BatchTracker)
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from inbox_agent.config import GMAIL_USER
+from inbox_agent.imap.labels import DESTINATION_CODES
 from inbox_agent.imap.models import Email
 from inbox_agent.rules import is_internal_ci
 
@@ -18,16 +19,14 @@ class EmailDecision:
     单封邮件在 ReAct 决策过程中的处置记录。
 
     Attributes:
-        add: 累积添加的标签集合（如 "promotions", "system_notification", "spam"）
-        remove: 累积移除的标签集合（如 "inbox", "spam"）
-        triaged: 是否已被模型显式处置（通过 apply_labels 确立去向）
+        destination: 最后一次成功处置的唯一最终去向
+        source_code: 邮件首次成功处置时的来源目录
         tldr: 模型的处置备忘、分类理由或内容提炼
         is_internal_ci: 是否属于系统自动化任务或 CI 简报（硬规则过滤标记）
     """
 
-    add: set[str] = field(default_factory=set)
-    remove: set[str] = field(default_factory=set)
-    triaged: bool = False
+    destination: str | None = None
+    source_code: str | None = None
     tldr: str = ""
     is_internal_ci: bool = False
 
@@ -45,14 +44,12 @@ class BatchTracker:
         self.user_email = user_email or GMAIL_USER
         # 邮件映射快速索引：按原生 UID 缓存 Email 实体，便于快速提取主题、发件人等元数据
         self.email_map: dict[int, Email] = {}
-        # 决策映射：记录每个 UID 的最终标签增删与处置理由
+        # 决策映射：记录每个 UID 的来源、唯一最终去向与处置理由
         self.triage_decisions: dict[int, EmailDecision] = {}
         # 日程池列表：收集大模型通过 create_calendar_event 成功提取的新增日程
         self.schedules: list[dict[str, Any]] = []
         # 草稿生成记录：收集大模型通过 create_email_draft 拟定的回复草稿
         self.created_drafts: list[dict[str, Any]] = []
-        # 垃圾箱解救记录：收集从 [Gmail]/Spam 中被成功识别为误杀并放回收件箱的邮件
-        self.rescued_items: list[dict[str, Any]] = []
 
     def register_batch_emails(self, emails: Sequence[Email]) -> None:
         """
@@ -65,46 +62,37 @@ class BatchTracker:
                 if e.uid not in self.triage_decisions:
                     self.triage_decisions[e.uid] = EmailDecision()
 
-    def record_labels(
+    def record_route(
         self,
         uids: list[int],
-        add: list[str],
-        remove: list[str],
+        destination: str,
         tldr: str = "",
-        current_code: str = "inbox",
+        source_code: str = "inbox",
         is_internal_ci: bool = False,
     ) -> None:
         """
-        记录工具 `apply_labels` 成功执行后的标签变更与处置理由。
+        记录成功处置的来源与唯一最终去向，不维护底层标签操作历史。
 
         Args:
             uids: 受到本次标签操作影响的邮件 UID 列表
-            add: 本次操作添加的业务标签代码列表
-            remove: 本次操作移除的业务标签代码列表
+            destination: 最后一次成功处置的唯一业务去向
             tldr: 模型的处置说明或备忘
-            current_code: 当前处理所在的目录代码（"inbox" 或 "spam"）
+            source_code: 首次成功处置时所在的目录代码
             is_internal_ci: 是否属于内部 CI / 自动化任务简报（硬规则过滤）
         """
+        if destination not in DESTINATION_CODES:
+            raise ValueError("每次成功处置必须明确一个最终去向")
         for uid in uids:
             if uid not in self.triage_decisions:
-                self.triage_decisions[uid] = EmailDecision(triaged=True, tldr=tldr)
+                self.triage_decisions[uid] = EmailDecision()
             dec = self.triage_decisions[uid]
-            dec.triaged = True
-            dec.add.update(add)
-            dec.remove.update(remove)
+            if dec.source_code is None:
+                dec.source_code = source_code
+            dec.destination = destination
             if is_internal_ci:
                 dec.is_internal_ci = True
             if tldr:
                 dec.tldr = tldr
-
-            # 【垃圾箱解救识别逻辑】
-            # 当且仅当当前目录为 spam 垃圾箱，且操作中移除了 "spam" 标签，
-            # 同时目标去向包含收件箱（或保持默认收件箱）时，确认为有效解救的正常邮件
-            if current_code == "spam" and "spam" in remove and ("inbox" in add or not add):
-                email_obj = self.email_map.get(uid)
-                item_dict = self._email_to_report_dict(email_obj, uid=uid, tldr=dec.tldr)
-                if not any(r.get("uid") == uid for r in self.rescued_items):
-                    self.rescued_items.append(item_dict)
 
     def record_schedule(self, schedule_dict: dict[str, Any]) -> None:
         """记录成功通过工具创建的日程事项"""
@@ -154,14 +142,23 @@ class BatchTracker:
     # =========================================================================
 
     @property
+    def rescued_items(self) -> list[dict[str, Any]]:
+        """按最终去向投影垃圾箱解救项，后续改判会自动反映在结果中。"""
+        return [
+            self._email_to_report_dict(self.email_map.get(uid), uid=uid, tldr=dec.tldr)
+            for uid, dec in self.triage_decisions.items()
+            if dec.source_code == "spam" and dec.destination == "inbox"
+        ]
+
+    @property
     def importants(self) -> list[dict[str, Any]]:
         """
         留存在收件箱中的高优先级/重要来信。
-        判定准则：模型在处置时未将其移出收件箱（remove 中不包含 'inbox'）。
+        判定准则：最终 destination 为 inbox；未处置邮件不算已确认留存。
         """
         result = []
         for uid, dec in self.triage_decisions.items():
-            if "inbox" not in dec.remove:
+            if dec.destination == "inbox":
                 e = self.email_map.get(uid)
                 result.append(self._email_to_report_dict(e, uid=uid, tldr=dec.tldr))
         return result
@@ -187,10 +184,10 @@ class BatchTracker:
 
     @property
     def systems(self) -> list[dict[str, Any]]:
-        """被归档至「系统通知」专属目录的邮件列表（add 中包含 'system_notification'，已过滤内部 CI 报告）"""
+        """最终去向为系统通知的邮件，过滤内部 CI 报告。"""
         result = []
         for uid, dec in self.triage_decisions.items():
-            if "system_notification" in dec.add:
+            if dec.destination == "system_notification":
                 # 过滤自建 CI 任务报告，不在日报展示层冗余呈现（严格对齐发件人校验，防止外部仿冒前缀隐身）
                 if self._is_ci_email(uid, dec):
                     continue
@@ -200,35 +197,35 @@ class BatchTracker:
 
     @property
     def marketings(self) -> list[dict[str, Any]]:
-        """被归档至「商业推广」专属目录的邮件列表（add 中包含 'promotions'）"""
+        """最终去向为商业推广的邮件。"""
         result = []
         for uid, dec in self.triage_decisions.items():
-            if "promotions" in dec.add:
+            if dec.destination == "promotions":
                 e = self.email_map.get(uid)
                 result.append(self._email_to_report_dict(e, uid=uid, tldr=dec.tldr))
         return result
 
     @property
     def spams(self) -> list[dict[str, Any]]:
-        """被移入垃圾箱的恶意欺诈/钓鱼邮件列表（add 中包含 'spam'）"""
+        """最终去向为 Spam 的邮件。"""
         result = []
         for uid, dec in self.triage_decisions.items():
-            if "spam" in dec.add:
+            if dec.destination == "spam":
                 e = self.email_map.get(uid)
                 result.append(self._email_to_report_dict(e, uid=uid, tldr=dec.tldr))
         return result
 
     @property
     def marketings_moved_count(self) -> int:
-        """从收件箱成功移入商业推广目录的邮件总数（add 包含 promotions 且 remove 包含 inbox）"""
-        return sum(1 for d in self.triage_decisions.values() if "promotions" in d.add and "inbox" in d.remove)
+        """来源为 Inbox 且最终去向为商业推广的邮件总数。"""
+        return sum(1 for d in self.triage_decisions.values() if d.source_code == "inbox" and d.destination == "promotions")
 
     @property
     def systems_moved_count(self) -> int:
         """从收件箱成功移入系统通知目录的邮件总数（排除内部自发 CI 简报，与 systems 列表展示口径严格一致）"""
         count = 0
         for uid, d in self.triage_decisions.items():
-            if "system_notification" in d.add and "inbox" in d.remove:
+            if d.source_code == "inbox" and d.destination == "system_notification":
                 if self._is_ci_email(uid, d):
                     continue
                 count += 1
@@ -236,5 +233,5 @@ class BatchTracker:
 
     @property
     def spams_moved_count(self) -> int:
-        """从收件箱成功移入垃圾邮件目录的邮件总数（add 包含 spam 且 remove 包含 inbox）"""
-        return sum(1 for d in self.triage_decisions.values() if "spam" in d.add and "inbox" in d.remove)
+        """来源为 Inbox 且最终去向为 Spam 的邮件总数。"""
+        return sum(1 for d in self.triage_decisions.values() if d.source_code == "inbox" and d.destination == "spam")

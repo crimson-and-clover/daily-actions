@@ -39,6 +39,9 @@ def labels_to_codes(labels: Sequence[str]) -> list[str]:
     return codes
 
 
+DESTINATION_CODES = ("inbox", "archive", "system_notification", "promotions", "verification_code", "finance_banking", "spam", "trash")
+
+
 class LabelService:
     """管理邮件的 Gmail 标签增删与分类 (基于 X-GM-LABELS，UID 统一为 int，Fail-Fast)"""
 
@@ -67,6 +70,12 @@ class LabelService:
         if remove:
             target_remove = [LABEL_SPECS[r].label_name if r in LABEL_SPECS else r for r in remove]
             client.remove_gmail_labels(uids, target_remove)
+
+    def route_emails(self, uids: Sequence[int], destination: str) -> None:
+        """成功处置后只保留一个业务去向，保留星标、已读及其他非去向标签。"""
+        if destination not in DESTINATION_CODES:
+            raise ValueError(f"不支持的邮件去向：{destination}")
+        self.set_labels(uids, add=[destination], remove=[code for code in DESTINATION_CODES if code != destination])
 
     def ensure_folder(self, folder_name: str) -> str:
         """确保指定文件夹存在，如不存在则创建"""
