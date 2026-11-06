@@ -29,7 +29,7 @@ from utils.timezone import get_now_bjt, parse_bjt_datetime
 
 
 class RouteEmailsArgs(BaseModel):
-    """完整正文返回后选择唯一最终去向（包含留存 Inbox）；程序统一互斥分流，禁止 Trash"""
+    """完整正文返回后为当前批次邮件选择唯一去向；跨目录搜索结果仅供参考，禁止 Trash"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -42,7 +42,7 @@ class RouteEmailsArgs(BaseModel):
 
 
 class MarkFlagsArgs(BaseModel):
-    """须先完整读取对应邮件并等待结果，再调整已读/未读或星标"""
+    """仅调整当前批次邮件的已读/未读或星标；须先完整阅读并等待结果"""
 
     email_uids: list[int] = Field(description="邮件 UID 列表 (int)")
     is_read: bool | None = Field(default=None, description="是否标记已读 (True=已读, False=未读)")
@@ -150,6 +150,9 @@ def _handle_route_emails(args: RouteEmailsArgs, ctx: ToolContext) -> dict[str, A
     return {
         "status": "success",
         "affected_uids": uids,
+        "source_code": ctx.current_code,
+        "source_folder": folder,
+        "affected_emails": _batch_email_identities(uids, ctx),
         "destination": destination,
         "tldr": tldr,
         "message": f"成功将 {len(uids)} 封邮件分流至唯一去向 {destination}",
@@ -169,6 +172,9 @@ def _handle_mark_flags(args: MarkFlagsArgs, ctx: ToolContext) -> dict[str, Any]:
         "is_read": args.is_read,
         "is_starred": args.is_starred,
         "code": code,
+        "source_code": ctx.current_code,
+        "source_folder": LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code,
+        "affected_emails": _batch_email_identities(uids, ctx),
         "message": f"已成功更新 {len(uids)} 封邮件的标志状态",
     }
 
@@ -381,6 +387,29 @@ AGENT_TOOLS: list[dict[str, Any]] = [
 ]
 
 
+def _batch_email_identities(uids: list[int], context: ToolContext) -> list[dict[str, Any]]:
+    """仅在批次范围校验通过后，将执行定位转换为稳定邮件身份。"""
+    emails = {email.uid: email for email in context.current_emails}
+    return [{"uid": uid, "message_id": emails[uid].message_id} for uid in dict.fromkeys(uids)]
+
+
+def _check_batch_scope(args: BaseModel, context: ToolContext) -> dict[str, Any] | None:
+    if not isinstance(args, (RouteEmailsArgs, MarkFlagsArgs)):
+        return None
+    code = args.code or context.current_code
+    folder = LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code
+    current = context.current_code
+    current_folder = LABEL_SPECS[current].folder_name if current in LABEL_SPECS else current
+    emails = {email.uid: email for email in context.current_emails if email.message_id}
+    if folder != current_folder or any(uid not in emails for uid in args.email_uids):
+        return {
+            "status": "error",
+            "code": "email_out_of_batch",
+            "message": "分流和旗标修改仅允许操作当前批次所属目录及 UID；跨目录或批次外搜索结果仅供阅读参考。",
+        }
+    return None
+
+
 def _check_full_read(
     args: BaseModel,
     context: ToolContext,
@@ -390,7 +419,8 @@ def _check_full_read(
     if isinstance(args, (RouteEmailsArgs, MarkFlagsArgs)):
         code = args.code or context.current_code
         folder = LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code
-        missing = [uid for uid in args.email_uids if (folder, uid) not in receipts]
+        identities = {email.uid: email.message_id.strip() for email in context.current_emails}
+        missing = [uid for uid in args.email_uids if receipts.get((folder, uid)) != identities.get(uid)]
         if not missing:
             return None
         detail = f"目录 {folder} 中的 UID {missing}"
@@ -427,6 +457,9 @@ def execute_tool(
     except Exception as e:
         return {"status": "error", "message": f"参数校验失败: {e}"}
     try:
+        scope_error = _check_batch_scope(validated_args, context)
+        if scope_error:
+            return scope_error
         read_error = _check_full_read(validated_args, context, context.fully_read_emails if read_snapshot is None else read_snapshot)
         if read_error:
             return read_error
