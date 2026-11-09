@@ -35,6 +35,7 @@ from inbox_agent.imap import (
     LabelService,
     MessageRepo,
 )
+from inbox_agent.imap.labels import PartialRouteError
 from inbox_agent.imap.models import Email
 from inbox_agent.memory import InboxMemory
 from inbox_agent.profile import load_user_profile
@@ -139,24 +140,27 @@ def main():
         rule_uids = [e.uid for e in rule_filtered_emails if e.uid]
         print(f"[规则预过滤] 命中 {len(rule_filtered_emails)} 封内部自动化/CI 邮件，直接规则归档至系统通知目录并标记已处理...")
         inbox_tracker.register_batch_emails(rule_filtered_emails)
-        archive_success = False
+        verified_uids: set[int] = set()
         if rule_uids:
             try:
                 label_service.route_emails(uids=rule_uids, destination="system_notification")
-                inbox_tracker.record_route(
-                    message_ids=[e.message_id for e in rule_filtered_emails if e.uid and e.message_id],
-                    destination="system_notification",
-                    tldr="系统自动化任务简报/CI通知（硬规则自动归档）",
-                    is_internal_ci=True,
-                )
-                archive_success = True
+                verified_uids.update(rule_uids)
+            except PartialRouteError as e:
+                verified_uids.update(e.verified_uids)
+                print(f"[规则预过滤 Warning] 已核验归档 {len(verified_uids)}/{len(rule_uids)} 封，分流中断: {e}", file=sys.stderr)
             except Exception as e:
                 print(f"[规则预过滤 Warning] 归档内部 CI 邮件失败: {e}，跳过标记已处理以便下次重试", file=sys.stderr)
 
-        if archive_success:
-            for e in rule_filtered_emails:
-                if e.message_id:
-                    memory.mark_processed(e.message_id)
+        verified_ids = [e.message_id for e in rule_filtered_emails if e.uid in verified_uids and e.message_id]
+        if verified_ids:
+            inbox_tracker.record_route(
+                message_ids=verified_ids,
+                destination="system_notification",
+                tldr="系统自动化任务简报/CI通知（硬规则自动归档）",
+                is_internal_ci=True,
+            )
+            for message_id in verified_ids:
+                memory.mark_processed(message_id)
             memory.save()
 
     # -------------------------------------------------------------------------

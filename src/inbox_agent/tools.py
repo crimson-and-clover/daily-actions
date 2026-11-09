@@ -20,6 +20,7 @@ from inbox_agent.imap import (
     LabelService,
     MessageRepo,
 )
+from inbox_agent.imap.labels import PartialRouteError
 from inbox_agent.memory import InboxMemory
 from utils.timezone import get_now_bjt, parse_bjt_datetime
 
@@ -145,17 +146,32 @@ def _handle_route_emails(args: RouteEmailsArgs, ctx: ToolContext) -> dict[str, A
     folder = LABEL_SPECS[code].folder_name if code in LABEL_SPECS else code
     ctx.connection.select_folder(folder)
 
-    ctx.label_service.route_emails(uids=uids, destination=destination)
-
-    return {
+    result: dict[str, Any] = {
         "status": "success",
-        "affected_uids": uids,
         "source_code": ctx.current_code,
         "source_folder": folder,
-        "affected_emails": _batch_email_identities(uids, ctx),
         "destination": destination,
         "tldr": tldr,
-        "message": f"成功将 {len(uids)} 封邮件分流至唯一去向 {destination}",
+    }
+    try:
+        ctx.label_service.route_emails(uids=uids, destination=destination)
+    except PartialRouteError as exc:
+        verified_uids = exc.verified_uids
+        verified_set = set(verified_uids)
+        unverified_uids = [uid for uid in dict.fromkeys(uids) if uid not in verified_set]
+        result.update(
+            status="partial_success" if unverified_uids else "success",
+            unverified_uids=unverified_uids,
+            message=f"已核验 {len(verified_uids)} 封邮件分流至 {destination}，未核验 {len(unverified_uids)} 封。分流中断原因：{exc}",
+        )
+    else:
+        verified_uids = list(dict.fromkeys(uids))
+        result["message"] = f"成功将 {len(verified_uids)} 封邮件分流至唯一去向 {destination}"
+
+    return {
+        **result,
+        "affected_uids": verified_uids,
+        "affected_emails": _batch_email_identities(verified_uids, ctx),
     }
 
 
