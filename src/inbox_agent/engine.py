@@ -238,9 +238,10 @@ class AgentEngine:
                 else:
                     tool_result = execute_tool(fn_name, parsed_args, context, read_snapshot=read_snapshot)
 
-                # 仅当 route_emails 成功执行时，才确立邮件的最终去向并加入持久化集合
-                if tool_result.get("status") == "success":
-                    if fn_name == "route_emails":
+                status = tool_result.get("status")
+                if fn_name == "route_emails":
+                    # 部分成功时，affected_emails 也只包含已核验唯一去向的邮件。
+                    if status in {"success", "partial_success"}:
                         destination = tool_result["destination"]
                         tldr = parsed_args.get("tldr", "")
                         message_ids = [item["message_id"] for item in tool_result["affected_emails"]]
@@ -254,10 +255,11 @@ class AgentEngine:
                                 tldr=tldr,
                                 source_code=tool_result["source_code"],
                             )
-                    elif fn_name == "create_calendar_event" and tracker:
+                elif status == "success" and tracker:
+                    if fn_name == "create_calendar_event":
                         if tool_result.get("schedule"):
                             tracker.record_schedule(tool_result["schedule"])
-                    elif fn_name == "create_email_draft" and tracker:
+                    elif fn_name == "create_email_draft":
                         if tool_result.get("draft"):
                             tracker.record_draft(tool_result["draft"])
 
@@ -273,8 +275,7 @@ class AgentEngine:
                 })
 
         # 批次提交持久化状态：
-        # 严格基于 dispositioned_msg_ids（仅经 route_emails 成功处置并确立去向的邮件）入库
-        # 彻底杜绝工具调用失败中途退出时未处置邮件被误标为已处理
+        # 只登记经 route_emails 核验成功的邮件，即使同次调用中还有未核验的邮件。
         submitted_count = 0
         for e in batch_emails:
             if e.message_id and e.message_id in dispositioned_msg_ids:
