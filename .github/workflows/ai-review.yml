@@ -1,8 +1,16 @@
 name: Qodo PR-Agent AI Review
+run-name: Qodo 审查 · PR #${{ inputs.pr_number }}
 
 on:
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR 编号
+        type: string
+        required: true
+      head_sha:
+        description: 预期审查的提交 SHA（手动运行可留空）
+        type: string
 
 permissions:
   contents: read
@@ -11,21 +19,19 @@ permissions:
 
 jobs:
   ai-review:
-    # 仅当在 PR 评论中明确包含 /ai-review，由非 Bot 且具备仓库权限的用户触发
-    if: |
-      github.event.issue.pull_request != null &&
-      github.event.sender.type != 'Bot' &&
-      contains(github.event.comment.body, '/ai-review') &&
-      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Run Qodo PR-Agent Review
         shell: bash
         env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ inputs.head_sha }}
           PYTHONUNBUFFERED: "1"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB__USER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -38,10 +44,18 @@ jobs:
           CONFIG__RESPONSE_LANGUAGE: "zh-CN"
           CONFIG__GIT_PROVIDER: "github"
         run: |
-          PR_URL="${{ github.event.issue.pull_request.html_url }}"
-          if [ -z "$PR_URL" ]; then
-            PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}"
+          if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "PR 编号无效。"
+            exit 1
           fi
+          pr=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json state,headRefOid,url)
+          head_sha=$(jq -r .headRefOid <<< "$pr")
+          if [[ $(jq -r .state <<< "$pr") != OPEN || ( -n "$EXPECTED_HEAD_SHA" && "$head_sha" != "$EXPECTED_HEAD_SHA" ) ]]; then
+            echo "PR 已关闭或提交已更新，请针对当前提交重新发起审查。"
+            exit 1
+          fi
+          PR_URL=$(jq -r .url <<< "$pr")
+          echo "PR head: $head_sha"
           echo "Starting Qodo PR-Agent static review for: $PR_URL"
 
           docker run --rm \

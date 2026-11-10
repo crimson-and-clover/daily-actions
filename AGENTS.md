@@ -13,5 +13,6 @@
   - **严格控制交互轮数快速收敛**: 主智能体与子智能体工具调用必须保持克制，整体审查必须快速收敛并在 15 轮迭代内调用 GitHub API 提交 Review，严禁长时间处于排查或 PENDING 状态。
 
 ## Review Workflows
+- CI Launcher 在同一条 PR 评论中逐行解析命令，可同时请求两种审查。评论只包含已注册的命令和空行；仓库写权限用户可触发，机器人会回一条带 CI 链接的确认。
 - `/ai-review`: 触发轻量级纯静态代码审查（基于 Qodo PR-Agent + DeepSeek API），仅比对 PR Diff，秒级输出中文审查报告与行级修改建议。
-- `/ai-deep-review`: 触发基于 OpenHands 的多轮深度智能体审查，适用于涉及复杂环境验证的疑难 PR。
+- `/ai-deep-review`: 触发基于 OpenHands 的多轮深度智能体审查，适用于涉及复杂环境验证的疑难 PR，仅支持同仓库分支。
