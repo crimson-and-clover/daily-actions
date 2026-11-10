@@ -1,8 +1,16 @@
 name: OpenHands AI Deep PR Review
+run-name: OpenHands 深度审查 · PR #${{ inputs.pr_number }}
 
 on:
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR 编号
+        type: string
+        required: true
+      head_sha:
+        description: 预期审查的提交 SHA（手动运行可留空）
+        type: string
 
 permissions:
   contents: read
@@ -11,11 +19,6 @@ permissions:
 
 jobs:
   ai-deep-review:
-    # 仅当在 PR 评论中明确包含 /ai-deep-review 且由仓库所有者/协作者触发时执行
-    if: |
-      github.event.issue.pull_request != null &&
-      contains(github.event.comment.body, '/ai-deep-review') &&
-      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-24.04
 
     steps:
@@ -23,14 +26,27 @@ jobs:
         id: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ inputs.head_sha }}
         run: |
-          gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefName,headRepository,baseRefName,title,number > pr_info.json
-          
+          if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "PR 编号无效。"
+            exit 1
+          fi
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json state,headRefName,headRefOid,isCrossRepository,baseRefName,number,title > pr_info.json
+          head_sha=$(jq -r .headRefOid pr_info.json)
+          if [[ $(jq -r .state pr_info.json) != OPEN || ( -n "$EXPECTED_HEAD_SHA" && "$head_sha" != "$EXPECTED_HEAD_SHA" ) ]]; then
+            echo "PR 已关闭或提交已更新，请针对当前提交重新发起审查。"
+            exit 1
+          fi
+          if [[ $(jq -r .isCrossRepository pr_info.json) != false ]]; then
+            echo "深度审查只支持同仓库分支。"
+            exit 1
+          fi
+
           echo "head_ref=$(jq -r .headRefName pr_info.json)" >> "$GITHUB_OUTPUT"
-          echo "head_repo=$(jq -r .headRepository.nameWithOwner pr_info.json)" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
           echo "base_ref=$(jq -r .baseRefName pr_info.json)" >> "$GITHUB_OUTPUT"
-          echo "title=$(jq -r .title pr_info.json)" >> "$GITHUB_OUTPUT"
           echo "pr_number=$(jq -r .number pr_info.json)" >> "$GITHUB_OUTPUT"
 
       - name: Checkout OpenHands extensions
@@ -42,18 +58,18 @@ jobs:
       - name: Checkout PR repository
         uses: actions/checkout@v7
         with:
-          repository: ${{ steps.pr.outputs.head_repo }}
-          ref: ${{ steps.pr.outputs.head_ref }}
+          ref: ${{ steps.pr.outputs.head_sha }}
           fetch-depth: 0
           persist-credentials: false
           path: pr-repo
           submodules: recursive
 
-      - name: Fetch Base Branch for Diff
+      - name: Prepare Base Branch for Diff
         working-directory: pr-repo
+        env:
+          BASE_REF: ${{ steps.pr.outputs.base_ref }}
         run: |
-          git remote add upstream "https://github.com/${{ github.repository }}.git" 2>/dev/null || true
-          git fetch upstream "${{ steps.pr.outputs.base_ref }}:${{ steps.pr.outputs.base_ref }}" 2>/dev/null || git fetch origin "${{ steps.pr.outputs.base_ref }}:${{ steps.pr.outputs.base_ref }}" 2>/dev/null || true
+          git branch -- "$BASE_REF" "refs/remotes/origin/$BASE_REF"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.3.0
@@ -79,12 +95,13 @@ jobs:
           LOAD_PUBLIC_SKILLS: 'false'
           COLLECT_FEEDBACK: 'true'
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
-          PR_TITLE: ${{ steps.pr.outputs.title }}
           PR_BASE_BRANCH: ${{ steps.pr.outputs.base_ref }}
           PR_HEAD_BRANCH: ${{ steps.pr.outputs.head_ref }}
           REPO_NAME: ${{ github.repository }}
           REVIEW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          PR_TITLE=$(jq -r .title pr_info.json)
+          export PR_TITLE
           cd pr-repo
           uv run --no-project --with "$OPENHANDS_SDK_PACKAGE" --with openhands-tools --with lmnr --with "fastmcp<4" --with "fastmcp-slim<4" \
             python ../extensions/plugins/pr-review/scripts/agent_script.py

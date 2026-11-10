@@ -1,0 +1,23 @@
+name: CI Launcher
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  dispatch:
+    if: github.event.issue.pull_request != null && github.event.comment.user.type == 'User' && contains(github.event.comment.body, '/')
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Launch requested workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/ci_launcher.py
