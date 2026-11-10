@@ -1,6 +1,8 @@
 import base64
 import json
 import sys
+import time
+from hashlib import sha256
 from http.cookiejar import MozillaCookieJar
 from pathlib import Path
 from typing import Any
@@ -11,6 +13,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from urllib3.util import Retry
 
 from glados_checkin.config import (
+    CHECKIN_CHALLENGE_URL,
     CHECKIN_URL,
     COOKIE_FILE,
     COOKIES_GLADOS,
@@ -22,7 +25,7 @@ from glados_checkin.config import (
 )
 
 
-def get_session(cookie_file: Path) -> requests.Session:
+def get_session(cookie_file: Path, *, retry_post: bool = True) -> requests.Session:
     """创建并配置支持自动重试的 Session"""
     session = requests.Session()
 
@@ -30,7 +33,7 @@ def get_session(cookie_file: Path) -> requests.Session:
     # total: 总重试次数
     # backoff_factor: 退避频率，等待时间 = {backoff_factor} * (2 ** (retry_count - 1))
     # status_forcelist: 遇到以下状态码时强制重试
-    retry_strategy = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504], allowed_methods=["POST", "GET"])
+    retry_strategy = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504], allowed_methods=["GET", "POST"] if retry_post else ["GET"])
 
     adapter = HTTPAdapter(max_retries=retry_strategy)
     session.mount("http://", adapter)
@@ -81,10 +84,13 @@ def run_exchange() -> bool:
         response = session.post(EXCHANGE_URL, json=payload, timeout=15)
         response.raise_for_status()  # 如果状态码不是 200，直接抛出异常
         data = response.json()
-        is_success = data.get("code") == 0
-        days_added = data.get("daysAdded", 0)
-        print(f"✅ 兑换请求完成！(增加 {days_added} 天)")
-        return is_success
+        code = data.get("code")
+        message = data.get("message")
+        if code == 0:
+            print(f"✅ 兑换成功！{message or ''}")
+            return True
+        print(f"❌ 兑换失败: {message or '未知消息'} (Error Code: {code})")
+        return False
     except requests.exceptions.RequestException as e:
         print(f"❌ 网络请求异常: {e}")
         raise e
@@ -94,26 +100,33 @@ def run_exchange() -> bool:
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1.5, min=1.0, max=10.0), reraise=False)
-def run_checkin() -> bool:
+def run_checkin() -> tuple[bool, float]:
     """执行签到逻辑"""
     if not COOKIE_FILE.exists():
         print(f"❌ 错误: 找不到 Cookie 文件 -> {COOKIE_FILE}")
-        return False
-    session = get_session(COOKIE_FILE)
-    payload = {"token": "glados.cloud"}
-    print("🚀 正在发起签到请求...")
+        return False, 0.0
     try:
-        response = session.post(CHECKIN_URL, json=payload, timeout=15)
-        response.raise_for_status()  # 如果状态码不是 200，直接抛出异常
-        data = response.json()
-        is_success, balance = analyze_result(data)
-        return is_success, balance
+        # 签到重试由外层负责，确保每次提交都使用新的 challenge。
+        with get_session(COOKIE_FILE, retry_post=False) as session:
+            response = session.get(CHECKIN_CHALLENGE_URL, timeout=15)
+            response.raise_for_status()
+            challenge = response.json()
+            nonce = challenge.get("nonce")
+            if challenge.get("code") != 0 or not isinstance(nonce, str) or not nonce:
+                print("❌ 签到失败: 未获取到有效的 challenge")
+                return False, 0.0
+
+            # 官网前端在 challenge 生成至少 2.5 秒后提交。
+            time.sleep(2.5)
+            proof = sha256(f"{nonce}.glados-observe-v1".encode()).hexdigest()
+            payload = {"token": "glados.cloud", "nonce": nonce, "proof": proof}
+            print("🚀 正在发起签到请求...")
+            response = session.post(CHECKIN_URL, json=payload, timeout=15)
+            response.raise_for_status()
+            return analyze_result(response.json())
     except requests.exceptions.RequestException as e:
         print(f"❌ 网络请求异常: {e}")
-        raise e
-    except json.JSONDecodeError:
-        print(f"❌ 解析响应失败: 响应内容不是有效的 JSON\n{response.text}")
-    return False, 0.0
+        raise
 
 
 def analyze_result(data: dict[str, Any]) -> tuple[bool, float]:
@@ -140,5 +153,5 @@ if __name__ == "__main__":
     success, balance = run_checkin()
     if success and balance >= 500:
         print("🎉 恭喜！你已经满足兑换条件，可以进行兑换了！")
-        run_exchange()
+        success = run_exchange()
     sys.exit(0 if success else 1)
