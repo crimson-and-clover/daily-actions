@@ -43,6 +43,13 @@ def github_api(endpoint: str, payload: dict | None = None) -> dict:
     return json.loads(result.stdout) if result.stdout.strip() else {}
 
 
+def post_receipt(endpoint: str, body: str) -> None:
+    try:
+        github_api(endpoint, {"body": body})
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
+        raise RuntimeError("发送 CI 回执失败，请根据入口日志确认派发结果。") from exc
+
+
 def launch_workflows(event: dict) -> int:
     issue = event.get("issue", {})
     comment = event.get("comment", {})
@@ -65,7 +72,7 @@ def launch_workflows(event: dict) -> int:
     reply_endpoint = f"{repo_path}/issues/{number}/comments"
     source = comment["html_url"]
     if pr["state"] != "open":
-        github_api(reply_endpoint, {"body": f"[CI 请求]({source})未执行，PR #{number} 已关闭。"})
+        post_receipt(reply_endpoint, f"[CI 请求]({source})未执行，PR #{number} 已关闭。")
         return 0
 
     head_sha = pr["head"]["sha"]
@@ -95,12 +102,13 @@ def launch_workflows(event: dict) -> int:
         else:
             server = os.environ["GITHUB_SERVER_URL"]
             run_url = run.get("html_url") or f"{server}/{repository}/actions/workflows/{workflow}"
+            print(f"{name} 已提交运行：{run_url}", flush=True)
             lines.append(f"- {name}：已提交运行 · [查看 CI]({run_url})")
 
     if had_error:
         router_url = f"{os.environ['GITHUB_SERVER_URL']}/{repository}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
         lines.extend(["", f"[查看入口 CI]({router_url})"])
-    github_api(reply_endpoint, {"body": "\n".join(lines)})
+    post_receipt(reply_endpoint, "\n".join(lines))
     return int(had_error)
 
 
