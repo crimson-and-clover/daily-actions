@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 __all__ = [
+    "CHECKIN_CHALLENGE_URL",
     "CHECKIN_URL",
     "COOKIE_FILE",
     "COOKIES_GLADOS",
@@ -37,7 +38,8 @@ COOKIE_FILE = Path(__file__).resolve().parent / "glados_cookies.txt"
 
 # 接口端点与网络配置
 CHECKIN_URL = "https://glados.cloud/api/user/checkin"
+CHECKIN_CHALLENGE_URL = f"{CHECKIN_URL}/challenge"
 EXCHANGE_URL = "https://glados.cloud/api/user/exchange"
 REFERER_URL = "https://glados.cloud/console/checkin"
 ORIGIN_URL = "https://glados.cloud"
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36"
