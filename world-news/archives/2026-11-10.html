@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全球宏观、市场与计算开源内参</title>
+    <style>
+        /* 移动端与桌面端自适应、彻底告别挤压折叠 */
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f1f3f5;
+            margin: 0;
+            padding: 12px 6px;
+            color: #1a202c;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #d2d6dc;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        /* 刊头：流式上下堆叠，绝不左右横向硬挤 */
+        .masthead {
+            padding: 20px 18px 14px 18px;
+            border-bottom: 2px solid #0f172a;
+            background: #ffffff;
+        }
+        .masthead-meta-top {
+            font-size: 11px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .masthead h1 {
+            margin: 4px 0 6px 0;
+            font-size: 21px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            line-height: 1.3;
+        }
+        .masthead-date {
+            font-size: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .masthead-sub {
+            margin: 0;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        /* 态势关键信号横条：采用竖向流式清单，杜绝横向窄列挤压 */
+        .signals-box {
+            padding: 12px 18px;
+            background-color: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .signals-title {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .signals-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .signals-list li {
+            position: relative;
+            padding-left: 14px;
+            font-size: 12.5px;
+            color: #334155;
+            line-height: 1.5;
+            margin-bottom: 6px;
+        }
+        .signals-list li:last-child {
+            margin-bottom: 0;
+        }
+        .signals-list li::before {
+            content: "▪";
+            position: absolute;
+            left: 0;
+            color: #2563eb;
+            font-size: 13px;
+        }
+
+        .content {
+            padding: 18px 16px;
+        }
+
+        /* 宏观态势综述 */
+        .summary-block {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #0f172a;
+            padding: 14px 16px;
+            margin-bottom: 24px;
+            border-radius: 0 4px 4px 0;
+        }
+        .summary-label {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+        .summary-body {
+            font-size: 13.5px;
+            color: #1e293b;
+            line-height: 1.65;
+            text-align: justify;
+        }
+
+        /* 板块分割栏 */
+        .section {
+            margin-bottom: 26px;
+        }
+        .section-header {
+            border-bottom: 1.5px solid #0f172a;
+            padding-bottom: 6px;
+            margin-bottom: 14px;
+        }
+        .section-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            display: inline-block;
+        }
+        .section-code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+            display: inline-block;
+            margin-left: 6px;
+        }
+
+        /* 条目卡片 */
+        .item-card {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            padding: 14px 14px 12px 14px;
+            margin-bottom: 16px;
+            border-radius: 4px;
+        }
+
+        /* 卡片头部：分层解耦，不再横向打架 */
+        .item-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .badge-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .item-tag {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #1d4ed8;
+            background-color: #eff6ff;
+            border: 1px solid #dbeafe;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .source-tag {
+            font-size: 10.5px;
+            color: #475569;
+            background-color: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        .score-pill-overall {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 2px;
+            background-color: #0f172a;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        /* 细分多维指标条：单起一行，清晰明了 */
+        .sub-metrics-row {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 10.5px;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed #f1f5f9;
+        }
+        .sub-metrics-row span {
+            color: #1e293b;
+        }
+
+        .item-title {
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.45;
+            color: #0f172a;
+            margin: 0 0 10px 0;
+        }
+        .item-title a {
+            color: #0f172a;
+            text-decoration: none;
+        }
+        .item-title a:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+
+        /* 段落式正文：流式撑满全宽，彻底消除 86px 逼仄分栏 */
+        .data-content {
+            font-size: 13px;
+            color: #1f2937;
+            line-height: 1.6;
+        }
+        .data-para {
+            margin-bottom: 8px;
+            text-align: justify;
+        }
+        .data-para:last-child {
+            margin-bottom: 0;
+        }
+        .para-label {
+            font-weight: 700;
+            color: #475569;
+            font-size: 12px;
+            display: inline;
+            margin-right: 4px;
+        }
+        .para-rationale {
+            font-size: 12px;
+            color: #64748b;
+            font-style: italic;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* 市场资产传导专属研判框：自适应流式排版 */
+        .market-box {
+            margin-top: 10px;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 3px solid #2563eb;
+            padding: 9px 12px;
+            font-size: 12.5px;
+            border-radius: 0 3px 3px 0;
+        }
+        .market-header {
+            font-weight: 700;
+            color: #1e40af;
+            font-size: 11px;
+            margin-bottom: 4px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .assets-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            padding: 1px 5px;
+            border-radius: 2px;
+            font-size: 11px;
+            margin-left: 4px;
+            font-weight: 600;
+        }
+        .market-logic {
+            color: #0f172a;
+            line-height: 1.55;
+            text-align: justify;
+            margin-top: 4px;
+        }
+
+        /* 元信息脚标栏 */
+        .item-footer {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px dashed #e2e8f0;
+            font-size: 11px;
+            color: #94a3b8;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .item-footer a {
+            color: #64748b;
+            text-decoration: none;
+        }
+        .item-footer a:hover {
+            text-decoration: underline;
+        }
+        .stat-badge {
+            color: #334155;
+            font-weight: 600;
+        }
+
+        /* 脚注 */
+        .footer {
+            padding: 16px 18px;
+            font-size: 11px;
+            color: #64748b;
+            background: #fafafa;
+            border-top: 1px solid #e5e7eb;
+            line-height: 1.55;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="padding: 12px 18px 0 18px; font-size: 12px; color: #64748b; background: #ffffff;">
+            <a href="../index.html" style="color: #2563eb; text-decoration: none; font-weight: 500;">&larr; 返回资讯专区目录</a>
+            <span style="margin: 0 8px; color: #cbd5e1;">|</span>
+            <a href="../../index.html" style="color: #64748b; text-decoration: none;">知识门户总览</a>
+        </div>
+        <!-- 刊头 -->
+        <div class="masthead">
+            <div class="masthead-meta-top">GLOBAL INTELLIGENCE & TECHNOLOGY BRIEFING</div>
+            <h1>全球宏观、市场与计算开源内参</h1>
+            <div class="masthead-date">2026年11月10日 (北京时间)</div>
+            <p class="masthead-sub">
+                多源聚合 • 多维度量化评级 (Overall &ge; 7.0) • 资本市场与产业传导研判
+            </p>
+        </div>
+
+        <!-- 态势关键信号栏：纵向流式清单，彻底解决横向挤压 -->
+        <div class="signals-box">
+            <div class="signals-title">KEY SIGNALS / 核心态势信号</div>
+            <ul class="signals-list">
+                <li>中国10月顺差首破1万亿美元，美欧关税升级风险上升，人民币与出口链估值承压。</li>
+                <li>美方拒绝中俄预设峰会脚本并推动军控议题，地缘风险溢价支撑金价与美债。</li>
+                <li>特朗普淡化对伊打击，原油风险溢价快速回吐，能源股与通胀预期同步下修。</li>
+                <li>日本30年期国债拍卖疲软叠加黄金托管东移，全球久期与美元储备体系承压。</li>
+            </ul>
+        </div>
+
+        <div class="content">
+
+            <!-- 宏观态势综述 -->
+            <div class="summary-block">
+                <div class="summary-label">EXECUTIVE SUMMARY / 宏观态势与市场综述</div>
+                <div class="summary-body">中国贸易顺差破万亿与美方拒绝对华峰会脚本，凸显大国博弈与贸易失衡升温；中东打击预期降温令油价风险溢价回吐，日债长端拍卖疲软与新加坡黄金托管折射储备多元化。技术端前沿模型迭代、实时支付与300毫米碳化硅突破，共同指向AI推理边缘化与基础设施降本。</div>
+            </div>
+
+            <!-- 第一板块：宏观地缘与金融资本市场 -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">宏观地缘与全球金融市场</span>
+                    <span class="section-code">[SEC-01 / MACRO & FINANCIAL]</span>
+                </div>
+
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">全球贸易</span>
+                                <span class="source-tag">WSJ World</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.8 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>8.8</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>8.5</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>9.2</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/world/china/chinas-trade-surplus-surged-past-1-trillion-in-october-967968c9?mod=rss_worldnews" target="_blank">中国10月贸易顺差突破1万亿美元，出口逆势激增 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：单月贸易顺差破万亿美元，凸显全球产业链失衡与贸易摩擦升级风险</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>中国海关总署数据显示，10月货物贸易顺差首次突破1万亿美元，出口同比大幅增长，对美欧及东盟出货均强于预期；进口增速温和，显示内需仍偏弱。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>北京希望以出口稳增长并保就业；美国与欧盟指责产能过剩并酝酿新一轮关税；出口企业受益于订单，进口商与消费者承受成本；新兴市场担忧份额被挤占。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>顺差破万亿强化全球贸易失衡叙事，可能触发美欧对华关税与反补贴升级；供应链继续向东南亚分流，人民币面临升值与关税双重压力，WTO规则边缘化。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">离岸人民币CNH、中国出口链股票、铜期货、美欧关税敏感板块、中国10年期国债</span>
+                            </div>
+                            <div class="market-logic">巨额顺差带来结汇需求，短期支撑CNH并压低境内流动性溢价；但贸易摩擦升级预期压制出口股估值，铜等周期品受全球需求与关税不确定性扰动，避险情绪推升中国利率债。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: China’s Trade Surplus Surged Past $1 Trillion in O...</span>
+                            <span>Tue, 10 Nov 2026 04:04:00 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">地缘安全</span>
+                                <span class="source-tag">WSJ World</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.5 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>9.2</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>7.5</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.5</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/world/china/u-s-balks-at-chinas-demand-for-tightly-scripted-trump-xi-putin-summit-77001908?mod=rss_worldnews" target="_blank">美方拒绝中方对特朗普-习近平-普京峰会的严控议程要求 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：中美俄峰会脚本之争触及军控禁区，大国博弈定价权重构</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>美方拒绝中方提出的特朗普-习近平-普京三方峰会严格脚本与议程预设；特朗普表示希望将军控纳入议题，而军控长期是中国禁忌；三方代表团仍在协调会晤形式。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>美国欲以军控限制中国战略力量并展示斡旋成果；中国坚持不首先讨论军控、要求对等议程；俄罗斯借峰会寻求制裁松动；盟友担忧美中俄交易牺牲欧洲安全。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>峰会形式之争反映大国博弈进入议程设定权争夺；若军控被纳入，将重塑战略稳定框架；若破裂，阵营化加剧，欧洲与印太安全架构承压。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">美国10年期国债、黄金、防务板块ETF、原油、VIX</span>
+                            </div>
+                            <div class="market-logic">峰会不确定性推升地缘风险溢价，资金流入美债与黄金；防务股受军备预期支撑；若军控谈判预期升温，油价风险溢价回落，波动率曲线陡峭化。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: U.S. Balks at China’s Demand for Tightly Scripted ...</span>
+                            <span>Mon, 09 Nov 2026 20:37:00 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">大宗能源</span>
+                                <span class="source-tag">WSJ World</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.3 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>8.5</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>9.0</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>7.5</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.wsj.com/finance/commodities-futures/oil-prices-fall-staying-below-100-as-trump-plays-down-new-iran-strikes-27dc3911?mod=rss_worldnews" target="_blank">特朗普称暂不再打击伊朗，原油期货应声下挫 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：美方淡化对伊打击预期，油价即期定价与中东风险溢价重估</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>特朗普称对伊朗进一步军事打击“极不可能”，美国维持现状但保持“锁定待发”；此前沙特遭袭、霍尔木兹海峡附近事件频发；油价从8月以来最低收盘继续下跌。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>美国希望避免中东战争升级以稳油价；伊朗寻求威慑与制裁解除；沙特担忧设施安全；OPEC+关注份额与价格；炼厂与航运商对冲中断风险。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>美方淡化打击削弱中东风险溢价，但“锁定待发”保留升级选项；能源安全仍脆弱，霍尔木兹通行量上升短期缓解供应担忧，长期地缘溢价难以消除。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">WTI与布伦特原油期货、能源股ETF、美国航空股、通胀保值债券TIPS、美元指数</span>
+                            </div>
+                            <div class="market-logic">打击预期降温导致原油风险溢价快速回吐，WTI承压下行；能源股盈利预期下修；航空与运输板块受益于燃料成本下降；通胀预期回落利多美债，但美元因避险需求减弱而走软。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Oil Futures Slide as Trump Says New Strikes on Ira...</span>
+                            <span>Mon, 09 Nov 2026 20:50:00 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">主权债市</span>
+                                <span class="source-tag">Bloomberg Markets</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.0 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>7.6</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>8.2</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.5</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.bloomberg.com/news/articles/2026-11-10/japan-30-year-bond-sale-sees-weaker-demand-than-12-month-average-mwa53xcl" target="_blank">日本30年期国债拍卖需求疲弱，收益率曲线剧烈波动 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：日本30年期国债拍卖需求疲软，长端利率失控冲击全球套息交易</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>日本30年期国债拍卖需求疲弱，投标倍数与尾差显示承接不足；此前AI相关股票抛售引发收益率曲线剧烈波动；日本财务省与央行面临长端利率上行压力。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>财务省希望压低发债成本；日本央行需平衡YCC正常化与债市稳定；寿险与银行要求更高期限溢价；外资对冲成本上升而减少配置。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>长端日债利率失控风险上升，可能迫使央行加快加息或调整购债；日元套息交易逆转将冲击全球流动性，日本作为全球最大债权国的资本回流改变美债与澳债需求。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">日本30年期国债收益率、美元兑日元、美国10年期国债、全球银行股、套息交易相关货币对</span>
+                            </div>
+                            <div class="market-logic">拍卖疲软推高日债长端收益率，日美利差收窄引发日元升值与套息平仓；全球久期资产承压，美债收益率被动上行；银行股受利率曲线陡峭化支撑，但风险资产波动加剧。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Japan 30-Year Bond Sale Sees Weaker Demand After J...</span>
+                            <span>Tue, 10 Nov 2026 03:38:06 GMT</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">货币体系</span>
+                                <span class="source-tag">Bloomberg Markets</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 7.8 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            地缘战略:<span>8.0</span> &nbsp;•&nbsp; 
+                            市场敏感:<span>6.5</span> &nbsp;•&nbsp; 
+                            结构外溢:<span>8.6</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.bloomberg.com/news/articles/2026-11-10/singapore-launches-gold-vaulting-service-for-central-banks" target="_blank">新加坡面向外国央行推出黄金金库托管服务 ↗</a>
+                        </div>
+                        
+                        <!-- 正文：段落式全宽排版，阅读极为舒服 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：新加坡为外国央行提供黄金托管，加速储备去美元化与货币体系多极</span>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【事实与数据】</span>新加坡推出面向外国央行与官方机构的黄金金库托管服务，由新加坡金管局支持，旨在满足储备多元化需求；存储与结算依托新加坡自由港与本地精炼体系。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【博弈方态度】</span>新加坡欲成为亚洲黄金枢纽并提升金融中心地位；外国央行寻求去美元化与资产安全；伦敦与瑞士金库面临竞争；黄金生产商与精炼商受益于流转。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【产业链格局】</span>黄金托管东移反映储备资产多元化与对美元体系的不信任；东南亚央行增加黄金配置，削弱美元储备份额；新加坡挑战伦敦定价与托管垄断，推动多极化货币体系。
+                            </div>
+                        </div>
+
+                        <!-- 市场与资产定价传导核心模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>MARKET TRANSMISSION:</span>
+                                <span class="assets-badge">现货黄金、美元指数、新加坡交易所金融股、黄金矿业ETF、美债</span>
+                            </div>
+                            <div class="market-logic">央行黄金托管需求提升长期黄金配置预期，金价获得结构性买盘支撑；美元储备份额下降预期压制美元指数；避险与去美元化叙事降低美债边际需求，推升期限溢价。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <span>原始报道: Singapore Launches Gold Vaulting Service for Centr...</span>
+                            <span>Tue, 10 Nov 2026 03:00:10 GMT</span>
+                        </div>
+                    </div>
+            </div>
+
+            <!-- 第二板块：计算技术与开源前沿观察 -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">计算技术与开源工程前沿</span>
+                    <span class="section-code">[SEC-02 / COMPUTING & OPEN SOURCE]</span>
+                </div>
+
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">AI基础模型</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.8 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>9.0</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.8</span> &nbsp;•&nbsp; 
+                            工程落地:<span>8.5</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.anthropic.com/claude-fable-and-mythos-5-2" target="_blank">Claude Fable 5.2 与 Mythos 5.2 模型发布，社区讨论热度极高 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：新一代前沿模型发布，社区讨论热度极高，或将重排推理能力基线</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>Anthropic系新一代前沿大模型Fable 5.2与Mythos 5.2，采用混合专家与长上下文架构，强化推理、代码与智能体编排能力。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>攻克复杂多步推理与长程任务中的上下文衰减，降低工具调用错误率，提升代码生成与自主执行可靠性。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>Hacker News高热度讨论聚焦基准测试与真实任务表现，模型能力边界上移加剧OpenAI、Google与开源模型的军备竞赛，API定价与推理算力需求面临重估。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">Anthropic（未上市）、亚马逊AWS、英伟达GPU、AI基础设施ETF、微软Azure</span>
+                            </div>
+                            <div class="market-logic">模型能力跃升强化企业AI采用预期，利好云厂商与GPU需求；但模型商品化加速压缩API溢价，迫使二线模型厂商降价，资本开支向推理侧倾斜。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50429068" target="_blank">项目原帖: Claude Fable 5.2 and Mythos 5.2...</a>
+                            <span class="stat-badge">333 ★/pts &nbsp;|&nbsp; 676 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">支付基建</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.4 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>7.5</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.8</span> &nbsp;•&nbsp; 
+                            工程落地:<span>9.0</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.payments.ca/canada-launches-real-time-rail-bringing-247-payment-infrastructure-national-economy" target="_blank">Payments Canada 正式上线加拿大实时支付系统 RTR ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：国家级实时支付清算网络落地，重塑跨境与零售支付基础设施</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>加拿大实时支付系统RTR，基于ISO 20022报文标准与24/7/365清算架构，支持API接入与富数据支付，采用中心化实时结算。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>突破传统批量支付与延迟结算瓶颈，降低信用与流动性风险，支持即时不可撤销转账与请求付款。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区关注银行核心系统改造与金融科技接入；RTR推动加拿大支付现代化，挑战卡组织与延迟清算网络，安全与反欺诈成为焦点。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">加拿大五大银行、Visa与Mastercard、支付处理商、金融科技公司</span>
+                            </div>
+                            <div class="market-logic">实时账户到账户支付替代部分卡交易与支票，压缩卡组织交换费与处理商收入；银行获得存款黏性但需投入核心系统；fintech API生态扩张，行业定价权向账户侧转移。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50427362" target="_blank">项目原帖: Payments Canada announces launch of Canada&#39;s ...</a>
+                            <span class="stat-badge">491 ★/pts &nbsp;|&nbsp; 274 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">半导体硬件</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.4 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.8</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.0</span> &nbsp;•&nbsp; 
+                            工程落地:<span>8.2</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://www.infineon.com/press-release/2026/infpr202611-028" target="_blank">全球首片300毫米功率碳化硅晶圆问世 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：首片300毫米功率碳化硅晶圆，突破电动车与电网功率器件产能瓶颈</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>首片300毫米功率碳化硅晶圆，采用升华法长晶与大面积衬底加工，面向MOSFET与功率模块，尺寸从150/200毫米升级至300毫米。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>突破大尺寸SiC衬底缺陷密度与翘曲控制难题，单片可切芯片数提升约2.25倍，显著降低每安培成本。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区关注良率与成本曲线；300毫米推动SiC从高端车规向工业与电网规模化，Wolfspeed、英飞凌、意法半导体面临产能竞赛与价格战。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">Wolfspeed、英飞凌、意法半导体、电动车板块、电网设备ETF</span>
+                            </div>
+                            <div class="market-logic">大尺寸晶圆降本预期压制SiC衬底价格，利好电动车与光伏逆变器毛利率；设备商受益于扩产资本开支；二线厂商面临出清，行业集中度上升。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50429430" target="_blank">项目原帖: The first 300-millimeter power silicon carbid...</a>
+                            <span class="stat-badge">119 ★/pts &nbsp;|&nbsp; 66 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">端侧推理</span>
+                                <span class="source-tag">GitHub Trending</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 8.1 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>7.8</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>8.2</span> &nbsp;•&nbsp; 
+                            工程落地:<span>8.6</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://github.com/ccch1mneyyy/dsh-Go" target="_blank">dsh-Go：DeepSeek 推理框架实现手机本机运行与电脑远程调度 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：DeepSeek推理框架装入移动端本机运行，端侧算力与隐私范式革新</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>基于Dart/Flutter的DeepSeek Harness端侧推理框架，将模型量化后在本机运行，并通过远程协议调度个人电脑算力。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>突破移动端内存与算力限制，实现离线私有推理与低延迟响应，避免云端数据外泄与网络依赖。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>GitHub高星关注端侧部署与隐私计算；推动AI推理从云端向边缘迁移，手机SoC的NPU与内存带宽成为竞争焦点。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">高通、苹果、联发科、云推理服务商、DeepSeek生态</span>
+                            </div>
+                            <div class="market-logic">端侧推理普及降低云端推理调用量，削弱云厂商按token计费模式；手机芯片厂商受益于NPU需求，隐私合规优势提升终端换机价值。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://github.com/ccch1mneyyy/dsh-Go" target="_blank">项目原帖: [开源新星] ccch1mneyyy/dsh-Go (语言: Dart | ★17812)...</a>
+                            <span class="stat-badge">17812 ★/pts &nbsp;|&nbsp; 770 评论/分支</span>
+                        </div>
+                    </div>
+                    <div class="item-card">
+                        <!-- 第一行：标签 + 来源 + 综合总分 -->
+                        <div class="item-top-bar">
+                            <div class="badge-group">
+                                <span class="item-tag">算法理论</span>
+                                <span class="source-tag">Hacker News</span>
+                            </div>
+                            <span class="score-pill-overall">OVERALL 7.5 / 10</span>
+                        </div>
+
+                        <!-- 第二行：细分多维指标 -->
+                        <div class="sub-metrics-row">
+                            架构创新:<span>8.0</span> &nbsp;•&nbsp; 
+                            商业重塑:<span>6.8</span> &nbsp;•&nbsp; 
+                            工程落地:<span>7.4</span>
+                        </div>
+
+                        <!-- 标题 -->
+                        <div class="item-title">
+                            <a href="https://e-means.github.io/" target="_blank">E-means：以十分之一迭代轮次超越 k-means 的聚类算法 ↗</a>
+                        </div>
+
+                        <!-- 正文段落 -->
+                        <div class="data-content">
+                            <span class="para-rationale">评级依据：仅需十分之一迭代即超越k-means，聚类算法收敛效率实质改进</span>
+
+                            <div class="data-para">
+                                <span class="para-label">【定位与机理】</span>E-means聚类算法，通过改进初始化与迭代更新规则，在保持k-means目标函数的同时加速收敛。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【工程瓶颈突破】</span>攻克k-means对初始质心敏感与收敛慢的痛点，以十分之一迭代轮次达到或超越基线聚类质量。
+                            </div>
+                            
+                            <div class="data-para">
+                                <span class="para-label">【生态与反响】</span>社区讨论聚焦大规模数据分析与嵌入向量聚类；算法效率提升降低算力成本，对ML库与数据分析平台有直接集成价值。
+                            </div>
+                        </div>
+
+                        <!-- 产业与商业基础设施传导模块 -->
+                        <div class="market-box">
+                            <div class="market-header">
+                                <span>INDUSTRY & CAPITAL IMPACT:</span>
+                                <span class="assets-badge">Databricks、Snowflake、scikit-learn生态、云计算数据分析服务</span>
+                            </div>
+                            <div class="market-logic">聚类效率提升降低客户数据分析算力支出，增强平台粘性；开源实现削弱专有算法溢价，推动ML工具链商品化。</div>
+                        </div>
+
+                        <!-- 脚标 -->
+                        <div class="item-footer">
+                            <a href="https://news.ycombinator.com/item?id=50429734" target="_blank">项目原帖: E-means: Outperforming k-means in one-tenth t...</a>
+                            <span class="stat-badge">314 ★/pts &nbsp;|&nbsp; 28 评论/分支</span>
+                        </div>
+                    </div>
+            </div>
+
+        </div>
+
+        <!-- 脚注 -->
+        <div class="footer">
+            多源聚合：CNBC Markets、Wall Street Journal、BBC World News、Hacker News、GitHub Trending。<br>
+            多维评级：宏观（地缘战略 / 市场敏感 / 结构外溢），技术（架构突破 / 商业重塑 / 工程落地）。仅供专业研判参考。
+        </div>
+    </div>
+</body>
+</html>
