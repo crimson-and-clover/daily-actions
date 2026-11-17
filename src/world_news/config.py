@@ -46,7 +46,7 @@ load_dotenv()
 # 凭据与 CI 标记配置
 GMAIL_USER = (os.getenv("GMAIL_USER") or "").strip()
 GMAIL_APP_PASS = (os.getenv("GMAIL_APP_PASS") or "").replace(" ", "").strip()
-NOTIFICATION_EMAILS = parse_notification_emails(os.getenv("NOTIFICATION_EMAIL"), GMAIL_USER)
+NOTIFICATION_EMAILS = parse_notification_emails(os.getenv("NOTIFICATION_EMAILS"), GMAIL_USER)
 IS_CI = bool(os.getenv("CI"))
 
 

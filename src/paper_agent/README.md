@@ -30,4 +30,4 @@ uv run python -m paper_agent.agent
 ```
 > 本地无邮件凭据时，研报将自动生成并保存至 `docs/paper-agent/index.html`。
 
-邮件报告固定发送至 `GMAIL_USER`，不使用 `NOTIFICATION_EMAIL` 多收件人配置。
+邮件报告固定发送至 `GMAIL_USER`，不使用 `NOTIFICATION_EMAILS` 多收件人配置。
