@@ -46,7 +46,10 @@ def github_api(endpoint: str, payload: dict | None = None) -> dict:
 def post_receipt(endpoint: str, body: str) -> None:
     try:
         github_api(endpoint, {"body": body})
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
+    except subprocess.CalledProcessError as exc:
+        print(f"发送 CI 回执失败：{(exc.stderr or '').strip()}", flush=True)
+        raise RuntimeError("发送 CI 回执失败，请根据入口日志确认派发结果。") from exc
+    except (subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
         raise RuntimeError("发送 CI 回执失败，请根据入口日志确认派发结果。") from exc
 
 
