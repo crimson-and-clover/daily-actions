@@ -55,10 +55,12 @@
 | :--- | :---: | :--- | :--- |
 | `GMAIL_USER` | **必需** | Gmail 发信账号 | `inbox-agent`, `paper-agent`, `market-fx`, `world-news` |
 | `GMAIL_APP_PASS` | **必需** | Google 专用 16 位应用密码 (非登录密码) | `inbox-agent`, `paper-agent`, `market-fx`, `world-news` |
-| `NOTIFICATION_EMAIL`| 可选 | 接收通知的目标邮箱 (默认同 `GMAIL_USER`) | `inbox-agent`, `paper-agent`, `market-fx`, `world-news` |
+| `NOTIFICATION_EMAIL`| 可选 | 接收通知的目标邮箱，多个地址用英文逗号分隔 (默认同 `GMAIL_USER`) | `inbox-agent`, `paper-agent`, `market-fx`, `world-news` |
 | `DEEPSEEK_API_KEY` | **必需** | 驱动学术精读、要闻降噪与收件箱分流的大模型密钥 | `inbox-agent`, `paper-agent`, `world-news` |
 | `INBOX_STATE_KEY` | **必需** | 收件箱记忆库 AES 对称加密密钥 (`python scripts/generate_inbox_key.py`) | `inbox-agent`, `inbox-history-agent` |
 | `COOKIES_GLADOS` | 可选 | GLaDOS 鉴权 Cookie (支持 Base64 或原始文本) | `glados-checkin` |
+
+例如：`NOTIFICATION_EMAIL=your-address@gmail.com,another-address@163.com`，会同时发送给两个邮箱；空格和空项会被忽略，重复地址会去重。未设置时仍默认发送给 `GMAIL_USER`。GitHub Actions 中更新同名 Secret 即可生效，所有引用该 Secret 的邮件任务都会使用这组收件人。
 
 > [!IMPORTANT]
 > **开启 Workflow 读写权限 (必需)**：  
