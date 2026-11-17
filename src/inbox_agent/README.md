@@ -85,4 +85,4 @@ uv run python -m inbox_agent.history_agent
 ```
 > 无凭据时自动降级为离线模式，并在本地生成 `preview_email.html` 预览。
 
-邮件报告固定发送至 `GMAIL_USER`，不使用 `NOTIFICATION_EMAIL` 多收件人配置。
+邮件报告固定发送至 `GMAIL_USER`，不使用 `NOTIFICATION_EMAILS` 多收件人配置。
