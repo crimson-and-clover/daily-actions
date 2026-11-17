@@ -23,7 +23,7 @@ from inbox_agent.config import (
     GMAIL_APP_PASS,
     GMAIL_USER,
     IS_CI,
-    NOTIFICATION_EMAIL,
+    NOTIFICATION_EMAILS,
     PRUNE_DAYS,
     get_now_bjt,
     validate_config,
@@ -209,7 +209,7 @@ def main():
                 html_content=html_body,
                 gmail_user=GMAIL_USER,
                 gmail_pass=GMAIL_APP_PASS,
-                receiver=NOTIFICATION_EMAIL,
+                receivers=NOTIFICATION_EMAILS,
                 is_ci=IS_CI,
                 preview_path=preview_email_path,
             )

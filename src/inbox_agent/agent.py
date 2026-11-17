@@ -23,7 +23,7 @@ from inbox_agent.config import (
     GMAIL_USER,
     IS_CI,
     MAX_EMAILS_PER_RUN,
-    NOTIFICATION_EMAIL,
+    NOTIFICATION_EMAILS,
     get_now_bjt,
     validate_config,
 )
@@ -298,7 +298,7 @@ def main():
             html_content=email_html,
             gmail_user=GMAIL_USER,
             gmail_pass=GMAIL_APP_PASS,
-            receiver=NOTIFICATION_EMAIL,
+            receivers=NOTIFICATION_EMAILS,
             is_ci=IS_CI,
             preview_path=preview_email_path,
         )
