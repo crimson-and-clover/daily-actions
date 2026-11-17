@@ -22,7 +22,7 @@
 | :--- | :---: | :--- |
 | `GMAIL_USER` | **必需** | Gmail 发信主账号 |
 | `GMAIL_APP_PASS` | **必需** | Google 专用 16 位应用密码 |
-| `NOTIFICATION_EMAIL`| 可选 | 接收研报的目标邮箱（默认发送至 `GMAIL_USER`） |
+| `NOTIFICATION_EMAIL`| 可选 | 接收研报的目标邮箱，多个地址用英文逗号分隔（默认发送至 `GMAIL_USER`） |
 
 ---
 

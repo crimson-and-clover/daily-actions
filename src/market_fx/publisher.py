@@ -9,7 +9,7 @@ from market_fx.config import (
     GMAIL_APP_PASS,
     GMAIL_USER,
     IS_CI,
-    NOTIFICATION_EMAIL,
+    NOTIFICATION_EMAILS,
     PAGES_BASE_URL,
     TEMPLATES_HTML_DIR,
 )
@@ -78,7 +78,7 @@ def publish_reports(render_context: dict, iso_date_str: str, subject: str):
         html_content=email_html,
         gmail_user=GMAIL_USER,
         gmail_pass=GMAIL_APP_PASS,
-        receiver=NOTIFICATION_EMAIL,
+        receivers=NOTIFICATION_EMAILS,
         is_ci=IS_CI,
         preview_path=preview_path,
     )

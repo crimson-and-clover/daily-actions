@@ -59,7 +59,6 @@
 | `GMAIL_APP_PASS` | **必需** | Google 专用 16 位应用密码（非登录密码） |
 | `DEEPSEEK_API_KEY` | **必需** | 用于邮件多轮决策、日程提炼与工具调用的模型密钥 |
 | `INBOX_STATE_KEY` | **必需** | 收件箱记忆库 Fernet AES 对称加密密钥，保护邮件隐私与状态 |
-| `NOTIFICATION_EMAIL`| 可选 | 汇总邮件接收地址（默认发送至 `GMAIL_USER`） |
 
 ### 生成加密密钥
 运行仓库内置脚本即可生成 `INBOX_STATE_KEY`：
@@ -85,3 +84,5 @@ uv run python -m inbox_agent.agent
 uv run python -m inbox_agent.history_agent
 ```
 > 无凭据时自动降级为离线模式，并在本地生成 `preview_email.html` 预览。
+
+邮件报告固定发送至 `GMAIL_USER`，不使用 `NOTIFICATION_EMAIL` 多收件人配置。

@@ -6,6 +6,7 @@ import os
 import sys
 from pathlib import Path
 
+from utils.config import parse_notification_emails
 from utils.timezone import get_now_bjt
 
 __all__ = [
@@ -17,7 +18,7 @@ __all__ = [
     "IS_CI",
     "MEMORY_DIR",
     "MEMORY_FILE",
-    "NOTIFICATION_EMAIL",
+    "NOTIFICATION_EMAILS",
     "PAGES_BASE_URL",
     "TEMPLATES_HTML_DIR",
     "TICKERS_CONFIG",
@@ -28,7 +29,7 @@ __all__ = [
 # 凭据与 CI 标记配置
 GMAIL_USER = (os.getenv("GMAIL_USER") or "").strip()
 GMAIL_APP_PASS = (os.getenv("GMAIL_APP_PASS") or "").replace(" ", "").strip()
-NOTIFICATION_EMAIL = (os.getenv("NOTIFICATION_EMAIL") or "").strip() or GMAIL_USER
+NOTIFICATION_EMAILS = parse_notification_emails(os.getenv("NOTIFICATION_EMAIL"), GMAIL_USER)
 IS_CI = bool(os.getenv("CI"))
 
 

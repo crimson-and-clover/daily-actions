@@ -23,7 +23,7 @@ from world_news.config import (
     GMAIL_USER,
     IS_CI,
     MAX_NEWS_AGE_DAYS,
-    NOTIFICATION_EMAIL,
+    NOTIFICATION_EMAILS,
     PAGES_BASE_URL,
     PREVIEW_REPORT_PATH,
     get_now_bjt,
@@ -123,7 +123,7 @@ def main():
         html_content=email_html,
         gmail_user=GMAIL_USER,
         gmail_pass=GMAIL_APP_PASS,
-        receiver=NOTIFICATION_EMAIL,
+        receivers=NOTIFICATION_EMAILS,
         is_ci=IS_CI,
         preview_path=PREVIEW_REPORT_PATH,
     )

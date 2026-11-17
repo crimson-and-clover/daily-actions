@@ -36,13 +36,13 @@ def send_email_html(
     html_content: str,
     gmail_user: str,
     gmail_pass: str,
-    receiver: str,
+    receivers: list[str],
     is_ci: bool = False,
     preview_path: Path = Path("preview.html"),
 ) -> bool:
     """
     基于 redmail 与 tenacity 重试的 Gmail HTML 邮件发送工具。
-    入参明确显式传入邮箱凭据与接收人（已在各 Agent 的 config.py 统一清洗与校验）。
+    入参明确显式传入邮箱凭据与配置层解析好的收件地址列表。
     若未检测到凭证（本地开发），自动保存为本地 HTML 预览文件。
     """
     if not gmail_user or not gmail_pass:
@@ -57,7 +57,9 @@ def send_email_html(
         return False
 
     try:
-        print(f"正在通过 redmail 连接 smtp.gmail.com:465 发送邮件至 {receiver} (tenacity 重试保护)...", flush=True)
+        if not receivers:
+            raise ValueError("收件人列表不能为空")
+        print(f"正在通过 redmail 连接 smtp.gmail.com:465 发送邮件至 {', '.join(receivers)} (tenacity 重试保护)...", flush=True)
         email = EmailSender(
             host="smtp.gmail.com",
             port=465,
@@ -70,7 +72,7 @@ def send_email_html(
             email=email,
             subject=subject,
             sender=f"Daily Actions <{gmail_user}>",
-            receivers=[receiver],
+            receivers=receivers,
             html=html_content,
         )
         print(f"✅ 邮件发送成功！主题: {subject}", flush=True)

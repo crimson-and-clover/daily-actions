@@ -26,7 +26,6 @@ __all__ = [
     "MIN_OVERALL_SCORE",
     "MIN_RELEVANCE_SCORE",
     "MIN_SCREEN_RELEVANCE_SCORE",
-    "NOTIFICATION_EMAIL",
     "PAGES_BASE_URL",
     "RESEARCH_TRACKS",
     "TEMPLATES_HTML_DIR",
@@ -37,7 +36,6 @@ __all__ = [
 # 环境变量与外部配置
 GMAIL_USER = (os.getenv("GMAIL_USER") or "").strip()
 GMAIL_APP_PASS = (os.getenv("GMAIL_APP_PASS") or "").replace(" ", "").strip()
-NOTIFICATION_EMAIL = (os.getenv("NOTIFICATION_EMAIL") or "").strip() or GMAIL_USER
 IS_CI = bool(os.getenv("CI"))
 DEEPSEEK_API_KEY = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
 PAGES_BASE_URL = os.getenv("PAGES_BASE_URL", "https://crimson-and-clover.github.io/daily-actions")

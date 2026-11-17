@@ -20,7 +20,6 @@
 | `GMAIL_USER` | **必需** | Gmail 发信主账号 |
 | `GMAIL_APP_PASS` | **必需** | Google 专用 16 位应用密码 |
 | `DEEPSEEK_API_KEY` | **必需** | 驱动两阶段学术研判与打分的大模型密钥 |
-| `NOTIFICATION_EMAIL`| 可选 | 接收研报的目标邮箱（默认发送至 `GMAIL_USER`） |
 
 ---
 
@@ -30,3 +29,5 @@
 uv run python -m paper_agent.agent
 ```
 > 本地无邮件凭据时，研报将自动生成并保存至 `docs/paper-agent/index.html`。
+
+邮件报告固定发送至 `GMAIL_USER`，不使用 `NOTIFICATION_EMAIL` 多收件人配置。

@@ -10,7 +10,6 @@ from reviewer_radar.config import (
     GMAIL_APP_PASS,
     GMAIL_USER,
     IS_CI,
-    NOTIFICATION_EMAIL,
     validate_config,
 )
 from reviewer_radar.engine import ReviewerRadarEngine
@@ -64,7 +63,7 @@ def run_reviewer_radar() -> None:
         html_content=email_html,
         gmail_user=GMAIL_USER,
         gmail_pass=GMAIL_APP_PASS,
-        receiver=NOTIFICATION_EMAIL,
+        receivers=[GMAIL_USER],
         is_ci=IS_CI,
         preview_path=preview_path,
     )
