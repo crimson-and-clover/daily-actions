@@ -4,7 +4,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from utils.config import parse_notification_emails
 from utils.timezone import BJT, get_now_bjt
 
 load_dotenv()
@@ -25,7 +24,6 @@ __all__ = [
     "MAX_AGENT_TURNS",
     "MAX_EMAILS_PER_RUN",
     "MEMORY_FILE",
-    "NOTIFICATION_EMAILS",
     "PRUNE_DAYS",
     "TEMPLATES_HTML_DIR",
     "get_now_bjt",
@@ -36,7 +34,6 @@ __all__ = [
 INBOX_STATE_KEY = (os.getenv("INBOX_STATE_KEY") or "").strip()
 GMAIL_USER = (os.getenv("GMAIL_USER") or "").strip()
 GMAIL_APP_PASS = (os.getenv("GMAIL_APP_PASS") or "").replace(" ", "").strip()
-NOTIFICATION_EMAILS = parse_notification_emails(os.getenv("NOTIFICATION_EMAIL"), GMAIL_USER)
 DEEPSEEK_API_KEY = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
 IS_CI = bool(os.getenv("CI"))
 

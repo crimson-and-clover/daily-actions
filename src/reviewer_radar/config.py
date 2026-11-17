@@ -9,14 +9,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from utils.config import parse_notification_emails
-
 load_dotenv()
 
 # 基础环境变量与外部服务密钥
 GMAIL_USER = (os.getenv("GMAIL_USER") or "").strip()
 GMAIL_APP_PASS = (os.getenv("GMAIL_APP_PASS") or "").replace(" ", "").strip()
-NOTIFICATION_EMAILS = parse_notification_emails(os.getenv("NOTIFICATION_EMAIL"), GMAIL_USER)
 IS_CI = bool(os.getenv("CI"))
 DEEPSEEK_API_KEY = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
 OPENREVIEW_PROFILE_ID = (os.getenv("OPENREVIEW_PROFILE_ID") or "").strip()

@@ -35,7 +35,6 @@ from paper_agent.config import (
     MIN_OVERALL_SCORE,
     MIN_RELEVANCE_SCORE,
     MIN_SCREEN_RELEVANCE_SCORE,
-    NOTIFICATION_EMAILS,
     PAGES_BASE_URL,
     RESEARCH_TRACKS,
     get_now_bjt,
@@ -185,7 +184,7 @@ def main():
         html_content=email_html,
         gmail_user=GMAIL_USER,
         gmail_pass=GMAIL_APP_PASS,
-        receivers=NOTIFICATION_EMAILS,
+        receivers=[GMAIL_USER],
         is_ci=IS_CI,
         preview_path=preview_email_path,
     )
