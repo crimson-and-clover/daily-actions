@@ -28,13 +28,13 @@
 
 | 模块组件 | 调度周期 | 核心职能与业务价值 | 交付通道 | 详细配置 |
 | :--- | :--- | :--- | :--- | :---: |
-| **📬 Inbox Agent** | 每日 08:10 / 13:10 / 20:10<br>`10 0,5,12 * * * UTC` | **日常收件箱智能整理**：四维分类分流，日程待办提炼，自动归档 `商业推广`/`系统通知`，绝不物理硬删 | Gmail 卡片 | [README](src/inbox_agent/README.md) |
+| **📬 Inbox Agent** | 每日 08:10 / 13:10 / 20:10<br>由 VPS 调度器触发 | **日常收件箱智能整理**：四维分类分流，日程待办提炼，自动归档 `商业推广`/`系统通知`，绝不物理硬删 | Gmail 卡片 | [README](src/inbox_agent/README.md) |
 | **📦 Inbox History** | *已暂停调度 (暂时停用)* | **90天历史积压整理**：从最旧到较新按 10 封小批次研判，过期废件移入回收站，历史凭证与推广分类归档 | Gmail 报告 | [README](src/inbox_agent/README.md) |
-| **🤖 Paper Agent** | 工作日 08:35<br>`35 0 * * 1-5 UTC` | **AI 论文追踪**：追踪 8 大前沿赛道，大模型初筛与全文精读，提取方法架构图并探测官方存活开源代码 | Gmail / Pages | [README](src/paper_agent/README.md) |
-| **📊 Market FX** | 周二至周六 06:15<br>`15 22 * * 1-5 UTC` | **宏观资产与外汇早报**：主流外汇追踪、澳元真分位数、越南盾三角套算、美股科技大盘与大宗指标 | Gmail / Pages | [README](src/market_fx/README.md) |
-| **🌐 World News** | 每日 07:35<br>`35 23 * * * UTC` | **全球资讯与开源动态**：聚合 CNBC / WSJ / BBC / HN / GitHub，LLM Impact Score (>=7.0) 降噪过滤 | Gmail / Pages | [README](src/world_news/README.md) |
-| **🛡️ Glados Checkin**| 每日 08:20<br>`20 0 * * * UTC` | **服务状态维护**：自动签到与权益兑换，维持开发节点和代理账号活跃 | CI 日志 | [README](src/glados_checkin/README.md) |
-| **🚀 FFmpeg Sync** | 每周日 10:15<br>`15 2 * * 0 UTC` | **镜像自动同步**：轮询上游 gyan.dev 最新构建版本，打包发布至 GitHub Release | GitHub Release | [README](src/ffmpeg_mirror/README.md) |
+| **🤖 Paper Agent** | 工作日 08:35<br>由 VPS 调度器触发 | **AI 论文追踪**：追踪 8 大前沿赛道，大模型初筛与全文精读，提取方法架构图并探测官方存活开源代码 | Gmail / Pages | [README](src/paper_agent/README.md) |
+| **📊 Market FX** | 周二至周六 06:15<br>由 VPS 调度器触发 | **宏观资产与外汇早报**：主流外汇追踪、澳元真分位数、越南盾三角套算、美股科技大盘与大宗指标 | Gmail / Pages | [README](src/market_fx/README.md) |
+| **🌐 World News** | 每日 07:35<br>由 VPS 调度器触发 | **全球资讯与开源动态**：聚合 CNBC / WSJ / BBC / HN / GitHub，LLM Impact Score (>=7.0) 降噪过滤 | Gmail / Pages | [README](src/world_news/README.md) |
+| **🛡️ Glados Checkin**| 每日 08:20<br>由 VPS 调度器触发 | **服务状态维护**：自动签到与权益兑换，维持开发节点和代理账号活跃 | CI 日志 | [README](src/glados_checkin/README.md) |
+| **🚀 FFmpeg Sync** | 每周日 10:15<br>由 VPS 调度器触发 | **镜像自动同步**：轮询上游 gyan.dev 最新构建版本，打包发布至 GitHub Release | GitHub Release | [README](src/ffmpeg_mirror/README.md) |
 
 ---
 
@@ -134,3 +134,7 @@ uv run ruff format src/ scripts/
 ## 📄 开源许可证
 
 本项目基于 [MIT License](LICENSE) 许可证开源发布。
+
+## VPS 调度
+
+所有定时任务由项目内常驻调度器统一触发，GitHub Actions 负责执行。部署前请阅读 [调度器配置与部署](deploy/scheduler/README.md)。时间统一配置在 `deploy/scheduler/schedules.toml`，Inbox History 继续暂停。

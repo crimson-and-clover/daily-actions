@@ -1,0 +1,21 @@
+services:
+  scheduler:
+    build:
+      context: ../..
+      dockerfile: deploy/scheduler/Dockerfile
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 90s
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN:?请在 deploy/scheduler/.env 配置 GITHUB_TOKEN}
+    volumes:
+      - ./schedules.toml:/app/schedules.toml:ro
+      - scheduler-state:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  scheduler-state:
