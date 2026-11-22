@@ -3,7 +3,7 @@ Inbox Agent 决策与报表数据追踪器 (BatchTracker)
 负责在多批次 ReAct 会话中捕获工具调用的处置决策、日程提炼与移动统计，为简报渲染与运维汇总提供数据支撑
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -63,26 +63,26 @@ class BatchTracker:
 
     def record_route(
         self,
-        message_ids: list[str],
+        email_reasons: Mapping[str, str],
         destination: str,
-        tldr: str = "",
         source_code: str = "inbox",
         is_internal_ci: bool = False,
     ) -> None:
-        """按已注册邮件的 Message-ID 记录成功处置，避免目录间 UID 碰撞。"""
+        """按 Message-ID 与单封理由的映射记录成功处置，禁止使用批次共享摘要。"""
         if destination not in DESTINATION_CODES:
             raise ValueError("每次成功处置必须明确一个最终去向")
-        if any(message_id not in self.email_map for message_id in message_ids):
+        if any(message_id not in self.email_map for message_id in email_reasons):
             raise ValueError("处置记录必须绑定已注册的邮件 Message-ID")
-        for message_id in message_ids:
+        if any(not reason.strip() for reason in email_reasons.values()):
+            raise ValueError("每封邮件必须有独立的非空处置理由")
+        for message_id, tldr in email_reasons.items():
             dec = self.triage_decisions[message_id]
             if dec.source_code is None:
                 dec.source_code = source_code
             dec.destination = destination
             if is_internal_ci:
                 dec.is_internal_ci = True
-            if tldr:
-                dec.tldr = tldr
+            dec.tldr = tldr.strip()
 
     def record_schedule(self, schedule_dict: dict[str, Any]) -> None:
         """记录成功通过工具创建的日程事项"""

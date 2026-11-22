@@ -31,7 +31,7 @@
 
 | 工具名称 | 功能描述 |
 | :--- | :--- |
-| **`route_emails`** | 批量选择唯一 destination（留存 Inbox、归档或分类分流），由程序执行互斥标签变更并记录处置备忘 |
+| **`route_emails`** | 通过 `emails=[{email_uid, tldr}, ...]` 逐封绑定独立处置理由，相同 destination 可合批；仅核验成功的邮件及其理由进入 tracker 和简报 |
 | **`mark_email_flags`** | 调整邮件已读/未读状态或标星置顶旗标 |
 | **`read_email_content`** | 按 UID 深度抓取单封邮件完整正文与附件信息（按需调用，节省 Token） |
 | **`search_emails`** | 按关键词、发件人或未读状态检索邮件元数据 |

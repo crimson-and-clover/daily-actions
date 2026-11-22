@@ -153,9 +153,8 @@ def main():
         verified_ids = [e.message_id for e in rule_filtered_emails if e.uid in verified_uids and e.message_id]
         if verified_ids:
             inbox_tracker.record_route(
-                message_ids=verified_ids,
+                email_reasons={message_id: "系统自动化任务简报/CI通知（硬规则自动归档）" for message_id in verified_ids},
                 destination="system_notification",
-                tldr="系统自动化任务简报/CI通知（硬规则自动归档）",
                 is_internal_ci=True,
             )
             for message_id in verified_ids:
