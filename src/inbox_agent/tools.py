@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import openai
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from inbox_agent.imap import (
     LABEL_SPECS,
@@ -29,17 +29,45 @@ from utils.timezone import get_now_bjt, parse_bjt_datetime
 # ==============================================================================
 
 
+class EmailRouteItem(BaseModel):
+    """单封邮件与其独立的处置理由，不得混入其他邮件的事项。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email_uid: int = Field(description="当前批次中这封邮件的 UID")
+    tldr: str = Field(min_length=1, description="仅针对这封邮件的内容摘要及处置依据，不得包含其他邮件的事项或批次总结")
+
+    @field_validator("tldr")
+    @classmethod
+    def validate_tldr(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("每封邮件必须提供非空的独立处置理由")
+        return value
+
+
 class RouteEmailsArgs(BaseModel):
     """完整正文返回后为当前批次邮件选择唯一去向；跨目录搜索结果仅供参考，禁止 Trash"""
 
     model_config = ConfigDict(extra="forbid")
 
-    email_uids: list[int] = Field(description="邮件 UID 列表")
+    emails: list[EmailRouteItem] = Field(min_length=1, description="待分流邮件，每项必须包含 email_uid 和仅属于该邮件的 tldr；相同去向可合批")
     destination: Literal["inbox", "archive", "system_notification", "promotions", "verification_code", "finance_banking", "spam"] = Field(
         description="唯一最终去向：inbox 留存收件箱，或选择 archive/system_notification/promotions/verification_code/finance_banking/spam；其他去向会被移除，禁止 trash。",
     )
-    tldr: str = Field(default="", description="处置简要理由或备忘")
     code: str | None = Field(default=None, description="UID 所属目录的标签代码，默认沿用当前运行模式目录")
+
+    @field_validator("emails")
+    @classmethod
+    def validate_unique_uids(cls, values: list[EmailRouteItem]) -> list[EmailRouteItem]:
+        if len({item.email_uid for item in values}) != len(values):
+            raise ValueError("同一次分流调用中 email_uid 不得重复")
+        return values
+
+    @property
+    def email_uids(self) -> list[int]:
+        """执行定位和现有批次/全文阅读校验共用的 UID 视图，不作为工具参数导出。"""
+        return [item.email_uid for item in self.emails]
 
 
 class MarkFlagsArgs(BaseModel):
@@ -136,10 +164,7 @@ class ToolContext:
 def _handle_route_emails(args: RouteEmailsArgs, ctx: ToolContext) -> dict[str, Any]:
     uids = args.email_uids
     destination = args.destination
-    tldr = args.tldr
-
-    if not uids:
-        return {"status": "error", "message": "email_uids 不能为空"}
+    reasons = {item.email_uid: item.tldr for item in args.emails}
 
     # 切换至 UID 所属的目标目录上下文
     code = args.code or ctx.current_code
@@ -151,7 +176,6 @@ def _handle_route_emails(args: RouteEmailsArgs, ctx: ToolContext) -> dict[str, A
         "source_code": ctx.current_code,
         "source_folder": folder,
         "destination": destination,
-        "tldr": tldr,
     }
     try:
         ctx.label_service.route_emails(uids=uids, destination=destination)
@@ -171,7 +195,7 @@ def _handle_route_emails(args: RouteEmailsArgs, ctx: ToolContext) -> dict[str, A
     return {
         **result,
         "affected_uids": verified_uids,
-        "affected_emails": _batch_email_identities(verified_uids, ctx),
+        "affected_emails": [{**item, "tldr": reasons[item["uid"]]} for item in _batch_email_identities(verified_uids, ctx)],
     }
 
 

@@ -208,7 +208,7 @@ class AgentEngine:
                         f"当前批次中仍有 {len(unhandled_emails)} 封待办邮件尚未调用工具明确去向：\n"
                         + "\n".join(unhandled_list)
                         + "\n请先按系统规则调用 `read_email_content` 完整阅读尚未读全的邮件，再为具备操作条件的邮件调用 `route_emails` 明确处置去向。"
-                        "每封邮件只能选择一个 destination；保留收件箱使用 `route_emails(email_uids=[...], destination='inbox', tldr='...')`，确认垃圾则选择 spam。"
+                        "每封邮件只能选择一个 destination；保留收件箱使用 `route_emails(emails=[{'email_uid': UID, 'tldr': '仅属于此邮件的理由'}], destination='inbox')`，确认垃圾则选择 spam。"
                         "读取失败或仍被截断的邮件可保留未决并说明原因，不得为完成批次而绕过全文阅读；"
                         "学校活动邀请、可选报名等不符合日程准入规则的邮件只做分类，不得为补齐处置而创建日程。"
                     )
@@ -243,16 +243,14 @@ class AgentEngine:
                     # 部分成功时，affected_emails 也只包含已核验唯一去向的邮件。
                     if status in {"success", "partial_success"}:
                         destination = tool_result["destination"]
-                        tldr = parsed_args.get("tldr", "")
-                        message_ids = [item["message_id"] for item in tool_result["affected_emails"]]
-                        for message_id in message_ids:
+                        email_reasons = {item["message_id"]: item["tldr"] for item in tool_result["affected_emails"]}
+                        for message_id in email_reasons:
                             dispositioned_msg_ids.add(message_id)
                             msg_id_spam_map[message_id] = destination == "spam"
                         if tracker:
                             tracker.record_route(
-                                message_ids=message_ids,
+                                email_reasons=email_reasons,
                                 destination=destination,
-                                tldr=tldr,
                                 source_code=tool_result["source_code"],
                             )
                 elif status == "success" and tracker:
